@@ -11,6 +11,8 @@ use ratatui::backend::CrosstermBackend;
 use ratzilla::{
     event::KeyCode,
     DomBackend,
+    WebGl2Backend,
+    CanvasBackend,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -192,7 +194,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), B
 
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
-
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::{prelude::Closure, JsCast};
 #[cfg(target_arch = "wasm32")]
 use ratzilla::WebRenderer;
 
@@ -200,7 +203,10 @@ use ratzilla::WebRenderer;
 fn main() -> Result<(), Box<dyn Error>> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app = Rc::new(RefCell::new(App::new()));
-    let backend = DomBackend::new()?;
+    let backend = CanvasBackend::new_with_options(
+        ratzilla::backend::canvas::CanvasBackendOptions::new()
+            .grid_id("terminal-container")
+    )?;
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({
@@ -219,12 +225,40 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    terminal.draw_web(move |f| {
-        let mut app = app.borrow_mut();
-        app.fps_tracker.update();
-        app.tick();
-        ui(f, &app);
-    });
+    let terminal = Rc::new(RefCell::new(terminal));
+    let closure: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
+    *closure.borrow_mut() = Some(Closure::wrap(Box::new({
+        let closure = closure.clone();
+        let terminal = terminal.clone();
+        let app = app.clone();
+        move || {
+            {
+                let mut app = app.borrow_mut();
+                app.fps_tracker.update();
+                app.tick();
+                let mut term = terminal.borrow_mut();
+                term.draw(|f| {
+                    ui(f, &app);
+                }).unwrap();
+            }
+
+            let window = web_sys::window().unwrap();
+            window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                closure.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+                8, // 8ms (approx 120 FPS)
+            ).unwrap();
+        }
+    }) as Box<dyn FnMut()>));
+
+    let window = web_sys::window().unwrap();
+    window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        closure.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+        0,
+    ).unwrap();
+
+    if let Some(c) = closure.borrow_mut().take() {
+        c.forget();
+    }
 
     Ok(())
 }
