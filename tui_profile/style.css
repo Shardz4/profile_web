@@ -1,0 +1,43 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at center, #0f141a 0%, #05070a 100%);
+    overflow: hidden;
+}
+
+pre {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: 0px;
+    margin: 0;
+    padding: 20px;
+    background-color: #000000;
+    color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 20px 50px rgba(0, 240, 255, 0.15), 
+                0 0 0 1px rgba(0, 240, 255, 0.2);
+    /* Neon glow effect matching the terminal ACCENT color */
+    outline: none;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+/* Subtle terminal CRT scanline overlay */
+body::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    aspect-ratio: 16/9;
+    z-index: 10;
+    background-size: 100% 3px, 6px 100%;
+    pointer-events: none;
+    opacity: 0.45;
+}
