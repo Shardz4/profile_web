@@ -1,0 +1,14 @@
+# Rust build artifacts
+target/
+**/target/
+
+# Trunk/WASM build artifacts
+dist/
+**/dist/
+
+# Development/Local configurations
+.idea/
+.vscode/
+*.rs.bk
+node_modules/
+**/node_modules/

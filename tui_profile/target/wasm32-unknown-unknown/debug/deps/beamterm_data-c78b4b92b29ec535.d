@@ -1,9 +1,0 @@
-C:\Users\CREWMOBILE\Desktop\profile_web\tui_profile\target\wasm32-unknown-unknown\debug\deps\beamterm_data-c78b4b92b29ec535.d: C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\lib.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\atlas.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\glyph.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\serialization.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\../atlas/bitmap_font.atlas
-
-C:\Users\CREWMOBILE\Desktop\profile_web\tui_profile\target\wasm32-unknown-unknown\debug\deps\libbeamterm_data-c78b4b92b29ec535.rmeta: C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\lib.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\atlas.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\glyph.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\serialization.rs C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\../atlas/bitmap_font.atlas
-
-C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\lib.rs:
-C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\atlas.rs:
-C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\glyph.rs:
-C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\serialization.rs:
-C:\Users\CREWMOBILE\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\beamterm-data-0.10.0\src\../atlas/bitmap_font.atlas:
