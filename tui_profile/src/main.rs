@@ -121,13 +121,13 @@ fn render_header(f: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::styled("▸ ", Style::default().fg(ACCENT)),
             Span::styled(
-                "YOUR NAME",
+                "ARNAV SHARMA",
                 Style::default()
                     .fg(FG)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  ·  Systems Engineer  |  ML / Deep Learning  |  AI Researcher",
+                "  ·  Systems Architect  |  Machine Learning Engineer  |  Low-Level Enthusiast",
                 Style::default().fg(DIM),
             ),
         ]),
@@ -190,15 +190,15 @@ fn render_home(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  Hello, world. ", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
-            Span::styled("I'm [Your Name].", Style::default().fg(FG)),
+            Span::styled("I'm Arnav Sharma.", Style::default().fg(FG)),
         ]),
         Line::from(""),
         Line::from(Span::styled(
-            "  A systems tinkerer and ML practitioner who lives at the",
+            "  A Computer Science & Engineering student focused on building",
             Style::default().fg(FG),
         )),
         Line::from(Span::styled(
-            "  intersection of low-level hardware and high-level intelligence.",
+            "  high-performance, safety-critical systems.",
             Style::default().fg(FG),
         )),
         Line::from(""),
@@ -209,16 +209,16 @@ fn render_home(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  Currently: ", Style::default().fg(ACCENT)),
-            Span::styled("[Role / Position / School]", Style::default().fg(FG)),
+            Span::styled("NIT Hamirpur (CSE Student)", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("  Based in:  ", Style::default().fg(ACCENT)),
-            Span::styled("[City, Country]", Style::default().fg(FG)),
+            Span::styled("Solan, Himachal Pradesh, India", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("  Focus:     ", Style::default().fg(ACCENT)),
             Span::styled(
-                "Systems programming · Deep Learning · AI inference",
+                "Systems Programming · Computer Vision · Kernel Research",
                 Style::default().fg(FG),
             ),
         ]),
@@ -244,19 +244,19 @@ fn render_home(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("   OS   ", Style::default().fg(DIM)),
-            Span::styled("Linux / [Your OS]", Style::default().fg(FG)),
+            Span::styled("Linux / Bare-metal OS", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("   Lang ", Style::default().fg(DIM)),
-            Span::styled("Rust · Python · C/C++", Style::default().fg(FG)),
+            Span::styled("Rust · Python · C/C++ · Assembly", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("   ML   ", Style::default().fg(DIM)),
-            Span::styled("PyTorch · JAX · ONNX", Style::default().fg(FG)),
+            Span::styled("PyTorch · OpenCV · TensorRT", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("   Sys  ", Style::default().fg(DIM)),
-            Span::styled("RTOS · CUDA · eBPF", Style::default().fg(FG)),
+            Span::styled("Memory Mgmt · Distributed Systems", Style::default().fg(FG)),
         ]),
         Line::from(""),
         Line::from(Span::styled(
@@ -284,34 +284,29 @@ fn render_home(f: &mut Frame, area: Rect) {
 fn render_projects(f: &mut Frame, area: Rect) {
     let projects = vec![
         (
-            "[Project Alpha]",
+            "[Bare-Metal OS / Kernel]",
+            "C / Rust / Assembly",
+            "Implementing custom OS components, from demand paging to AI-integrated error detection.",
+        ),
+        (
+            "[High-Concurrency Engine]",
+            "Rust / C++",
+            "Building memory-safe, high-concurrency engines with lock-free queues and parallel architecture.",
+        ),
+        (
+            "[Real-Time CV Pipeline]",
+            "C++ / PyTorch / CUDA",
+            "Optimizing perception pipelines with TensorRT and OpenCV for unstructured environments.",
+        ),
+        (
+            "[Distributed Systems Engine]",
             "Rust",
-            "A high-throughput systems daemon with lock-free queues and eBPF observability hooks.",
+            "High-performance distributed systems architecture designed for resilience and concurrency.",
         ),
         (
-            "[Neural Compiler]",
-            "C++ / LLVM",
-            "Custom IR lowering pass for DNN operator fusion targeting edge inference hardware.",
-        ),
-        (
-            "[Bare-Metal RTOS]",
-            "C / ARMv7-M",
-            "Preemptive scheduler with priority inheritance mutexes; boots in < 2 ms on Cortex-M4.",
-        ),
-        (
-            "[LLM Inference Engine]",
-            "Python / CUDA",
-            "Quantized transformer inference pipeline with custom CUDA kernels; 3× faster than baseline.",
-        ),
-        (
-            "[Distributed RL Agent]",
-            "Python / Ray",
-            "Multi-agent reinforcement learning framework for robotics sim-to-real transfer experiments.",
-        ),
-        (
-            "[Add Your Project]",
-            "Your Stack",
-            "Describe what it does, the problem it solves, and what makes it interesting.",
+            "[Algorithmic Solver]",
+            "C++",
+            "Custom implementations for complex algorithmic problems optimized for time and space.",
         ),
     ];
 
@@ -362,30 +357,30 @@ fn render_skills(f: &mut Frame, area: Rect) {
     let systems_skills = vec![
         ("Rust", 92),
         ("C / C++", 88),
-        ("Linux Internals", 85),
-        ("RTOS / Bare-Metal", 80),
-        ("eBPF / Perf", 75),
-        ("CUDA / GPU Arch", 70),
-        ("Assembly (ARM/x86)", 65),
+        ("Linux Kernel", 85),
+        ("Bare-Metal OS", 80),
+        ("Memory Mgmt", 84),
+        ("x86_64 Assembly", 70),
+        ("CUDA / GPU Arch", 72),
     ];
 
     let ml_skills = vec![
         ("Python", 95),
         ("PyTorch", 90),
-        ("Deep Learning Theory", 88),
-        ("JAX / Flax", 78),
-        ("ONNX / TensorRT", 75),
-        ("Reinforcement Learning", 72),
-        ("Model Quantization", 70),
+        ("OpenCV", 86),
+        ("TensorRT", 80),
+        ("Deep Learning", 88),
+        ("Computer Vision", 85),
+        ("Model Optimization", 78),
     ];
 
     let tools_skills = vec![
         ("Git / GitHub", 95),
-        ("Docker / Containers", 85),
-        ("LLVM / Compilers", 70),
-        ("Distributed Systems", 75),
-        ("Data Pipelines", 72),
-        ("CI/CD", 80),
+        ("Distributed Systems", 82),
+        ("Competitive Prog.", 88),
+        ("Linux / Shell", 86),
+        ("Docker", 80),
+        ("CI/CD", 78),
         ("Vim / Neovim", 90),
     ];
 
@@ -444,23 +439,15 @@ fn render_contact(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ✉  Email   ", Style::default().fg(ACCENT)),
-            Span::styled("you@example.com", Style::default().fg(FG)),
+            Span::styled("arnav4324@gmail.com", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("  ⌘  GitHub  ", Style::default().fg(ACCENT)),
-            Span::styled("github.com/yourusername", Style::default().fg(FG)),
+            Span::styled("github.com/Shardz4", Style::default().fg(FG)),
         ]),
         Line::from(vec![
             Span::styled("  ∟  LinkedIn", Style::default().fg(ACCENT)),
-            Span::styled("linkedin.com/in/yourprofile", Style::default().fg(FG)),
-        ]),
-        Line::from(vec![
-            Span::styled("  ✦  Twitter ", Style::default().fg(ACCENT)),
-            Span::styled("@yourhandle", Style::default().fg(FG)),
-        ]),
-        Line::from(vec![
-            Span::styled("  ◈  Website ", Style::default().fg(ACCENT)),
-            Span::styled("yoursite.dev", Style::default().fg(FG)),
+            Span::styled("linkedin.com/in/arnav-sharma-z/", Style::default().fg(FG)),
         ]),
         Line::from(""),
         Line::from(Span::styled(
@@ -484,7 +471,7 @@ fn render_contact(f: &mut Frame, area: Rect) {
         .wrap(Wrap { trim: false });
     f.render_widget(contact, cols[0]);
 
-    // GPG / availability block
+    // availability block
     let avail_lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -494,13 +481,13 @@ fn render_contact(f: &mut Frame, area: Rect) {
         Line::from(vec![
             Span::styled("  ║ ", Style::default().fg(ACCENT)),
             Span::styled("Status   ", Style::default().fg(DIM)),
-            Span::styled("[Open / Busy]    ", Style::default().fg(FG)),
+            Span::styled("Open             ", Style::default().fg(FG)),
             Span::styled("║", Style::default().fg(ACCENT)),
         ]),
         Line::from(vec![
             Span::styled("  ║ ", Style::default().fg(ACCENT)),
             Span::styled("Timezone ", Style::default().fg(DIM)),
-            Span::styled("[UTC+X]          ", Style::default().fg(FG)),
+            Span::styled("UTC+5:30         ", Style::default().fg(FG)),
             Span::styled("║", Style::default().fg(ACCENT)),
         ]),
         Line::from(vec![
@@ -515,11 +502,11 @@ fn render_contact(f: &mut Frame, area: Rect) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "  PGP / GPG key:",
+            "  Location:",
             Style::default().fg(DIM),
         )),
         Line::from(Span::styled(
-            "  [0xYOUR_KEY_FINGERPRINT]",
+            "  Solan, HP, India",
             Style::default().fg(FG),
         )),
     ];
