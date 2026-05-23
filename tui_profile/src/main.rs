@@ -11,8 +11,6 @@ use ratatui::backend::CrosstermBackend;
 use ratzilla::{
     event::KeyCode,
     DomBackend,
-    WebGl2Backend,
-    CanvasBackend,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -45,7 +43,7 @@ use platform::*;
 use std::error::Error;
 
 // ─── Palette ────────────────────────────────────────────────────────────────
-const ACCENT: Color = Color::Cyan;
+// ACCENT color is determined dynamically in App::get_accent_color()
 const DIM: Color = Color::DarkGray;
 const FG: Color = Color::White;
 const BG: Color = Color::Black;
@@ -81,7 +79,13 @@ impl FpsTracker {
     }
 }
 
-// ─── App State ──────────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellState {
+    Typing,
+    Running,
+    Finished,
+}
+
 // ─── App State ──────────────────────────────────────────────────────────────
 struct App {
     pub tab_index: usize,
@@ -90,10 +94,73 @@ struct App {
     pub tick_count: u64,
     pub cpu_cores: Vec<f64>,
     pub cpu_history: Vec<f64>,
+    pub gpu_load: f64,
+    pub vram_usage: f64,
+    pub page_table: Vec<char>,
+    pub shell_cmds: Vec<(&'static str, Vec<&'static str>)>,
+    pub shell_cmd_idx: usize,
+    pub shell_char_idx: usize,
+    pub shell_state: ShellState,
+    pub shell_output: Vec<String>,
+    pub shell_wait_ticks: u32,
 }
 
 impl App {
     fn new() -> App {
+        let mut page_table = vec!['.'; 64];
+        for i in 0..64 {
+            if i % 7 == 0 {
+                page_table[i] = 'A';
+            } else if i % 13 == 0 {
+                page_table[i] = 'D';
+            } else if i % 19 == 0 {
+                page_table[i] = 'R';
+            }
+        }
+
+        let shell_cmds = vec![
+            (
+                "git log -n 3 --oneline",
+                vec![
+                    "a5f2b8c (HEAD -> main) feat: implement custom lock-free memory allocator",
+                    "3d92e10 refactor: optimize demand paging and TLB shootdown logic",
+                    "8b201fa fix: resolve GPU TensorRT thread synchronization race condition",
+                ],
+            ),
+            (
+                "cargo test --profile release",
+                vec![
+                    "   Compiling core-allocator v0.1.0",
+                    "   Compiling tui-profile v0.1.0",
+                    "    Finished release [optimized] target(s) in 1.42s",
+                    "     Running unittests src/main.rs",
+                    "test platform::tests::test_page_allocation ... ok",
+                    "test platform::tests::test_lock_free_queue ... ok",
+                    "test result: ok. 2 passed; 0 failed; 0 ignored",
+                ],
+            ),
+            (
+                "python3 train_detector.py --epochs 10",
+                vec![
+                    "[INFO] CUDA device detected: NVIDIA RTX 4090",
+                    "[INFO] Initializing PyTorch training pipeline...",
+                    "Epoch 1/10 - loss: 0.432 - acc: 89.2%",
+                    "Epoch 5/10 - loss: 0.125 - acc: 97.8%",
+                    "Epoch 10/10 - loss: 0.048 - acc: 99.4%",
+                    "Model weights exported successfully.",
+                ],
+            ),
+            (
+                "make build_kernel",
+                vec![
+                    "nasm -f elf64 src/boot/boot.asm -o build/boot.o",
+                    "x86_64-elf-gcc -c src/kernel/main.c -o build/main.o",
+                    "x86_64-elf-ld -n -T targets/linker.ld build/boot.o build/main.o -o build/kernel.bin",
+                    "Kernel compilation complete: build/kernel.bin",
+                ],
+            ),
+        ];
+
         App {
             tab_index: 0,
             tab_titles: vec!["  Home  ", "  Projects  ", "  Skills  ", "  Contact  "],
@@ -101,6 +168,15 @@ impl App {
             tick_count: 0,
             cpu_cores: vec![0.0; 8],
             cpu_history: Vec::new(),
+            gpu_load: 0.0,
+            vram_usage: 4.12,
+            page_table,
+            shell_cmds,
+            shell_cmd_idx: 0,
+            shell_char_idx: 0,
+            shell_state: ShellState::Typing,
+            shell_output: Vec::new(),
+            shell_wait_ticks: 0,
         }
     }
     pub fn next_tab(&mut self) {
@@ -132,6 +208,59 @@ impl App {
             self.cpu_history.push(avg_cpu);
             if self.cpu_history.len() > 30 {
                 self.cpu_history.remove(0);
+            }
+        }
+
+        // 3. Update simulated GPU load & VRAM
+        self.gpu_load = (45.0 + 35.0 * (t * 0.7).cos() + ((self.tick_count % 11) as f64)).clamp(0.0, 100.0);
+        let base_vram = if self.shell_state == ShellState::Running { 6.2 } else { 4.1 };
+        self.vram_usage = (base_vram + (t.sin() * 0.15)).clamp(1.0, 8.0);
+
+        // 4. Update simulated page table memory allocations
+        if self.tick_count % 15 == 0 {
+            let mut rng_seed = self.tick_count;
+            for _ in 0..3 {
+                let idx = (rng_seed % 64) as usize;
+                rng_seed = rng_seed.wrapping_add(17);
+                let states = ['.', 'A', 'D', 'R'];
+                let state_idx = (rng_seed % 4) as usize;
+                self.page_table[idx] = states[state_idx];
+            }
+        }
+
+        // 5. Shell simulator update logic
+        if self.shell_wait_ticks > 0 {
+            self.shell_wait_ticks -= 1;
+        } else {
+            match self.shell_state {
+                ShellState::Typing => {
+                    let (cmd, _) = &self.shell_cmds[self.shell_cmd_idx];
+                    if self.shell_char_idx < cmd.len() {
+                        self.shell_char_idx += 1;
+                        self.shell_wait_ticks = (self.tick_count % 3) as u32; 
+                    } else {
+                        self.shell_state = ShellState::Running;
+                        self.shell_wait_ticks = 15; // Wait before running
+                    }
+                }
+                ShellState::Running => {
+                    let (_, outputs) = &self.shell_cmds[self.shell_cmd_idx];
+                    let current_lines = self.shell_output.len();
+                    if current_lines < outputs.len() {
+                        self.shell_output.push(outputs[current_lines].to_string());
+                        self.shell_wait_ticks = 8;
+                    } else {
+                        self.shell_state = ShellState::Finished;
+                        self.shell_wait_ticks = 40;
+                    }
+                }
+                ShellState::Finished => {
+                    self.shell_cmd_idx = (self.shell_cmd_idx + 1) % self.shell_cmds.len();
+                    self.shell_char_idx = 0;
+                    self.shell_output.clear();
+                    self.shell_state = ShellState::Typing;
+                    self.shell_wait_ticks = 20;
+                }
             }
         }
     }
@@ -168,7 +297,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn Error>> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<(), Box<dyn Error>>
+where
+    B::Error: 'static,
+{
     use std::time::Duration;
     loop {
         app.fps_tracker.update();
@@ -203,10 +335,7 @@ use ratzilla::WebRenderer;
 fn main() -> Result<(), Box<dyn Error>> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app = Rc::new(RefCell::new(App::new()));
-    let backend = CanvasBackend::new_with_options(
-        ratzilla::backend::canvas::CanvasBackendOptions::new()
-            .grid_id("terminal-container")
-    )?;
+    let backend = DomBackend::new_by_id("terminal-container")?;
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({
@@ -226,39 +355,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let terminal = Rc::new(RefCell::new(terminal));
-    let closure: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
-    *closure.borrow_mut() = Some(Closure::wrap(Box::new({
-        let closure = closure.clone();
+    let closure = Closure::wrap(Box::new({
         let terminal = terminal.clone();
         let app = app.clone();
         move || {
-            {
-                let mut app = app.borrow_mut();
-                app.fps_tracker.update();
-                app.tick();
-                let mut term = terminal.borrow_mut();
-                term.draw(|f| {
-                    ui(f, &app);
-                }).unwrap();
-            }
-
-            let window = web_sys::window().unwrap();
-            window.set_timeout_with_callback_and_timeout_and_arguments_0(
-                closure.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
-                8, // 8ms (approx 120 FPS)
-            ).unwrap();
+            let mut app = app.borrow_mut();
+            app.fps_tracker.update();
+            app.tick();
+            let mut term = terminal.borrow_mut();
+            term.draw(|f| {
+                ui(f, &app);
+            }).unwrap();
         }
-    }) as Box<dyn FnMut()>));
+    }) as Box<dyn FnMut()>);
 
     let window = web_sys::window().unwrap();
-    window.set_timeout_with_callback_and_timeout_and_arguments_0(
-        closure.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
-        0,
+    window.set_interval_with_callback_and_timeout_and_arguments_0(
+        closure.as_ref().unchecked_ref(),
+        8, // 8ms (approx 120 FPS)
     ).unwrap();
 
-    if let Some(c) = closure.borrow_mut().take() {
-        c.forget();
-    }
+    closure.forget();
 
     Ok(())
 }
@@ -364,13 +481,24 @@ fn make_progress_bar(val: f64, width: usize) -> String {
 }
 
 // ─── Tab: Home ───────────────────────────────────────────────────────────────
+// ─── Tab: Home ───────────────────────────────────────────────────────────────
 fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
         .split(area);
 
-    // Left: bio
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(14), Constraint::Min(0)])
+        .split(cols[0]);
+
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(15), Constraint::Min(0)])
+        .split(cols[1]);
+
+    // Left: bio (top) & Shell Simulator (bottom)
     let bio_lines = vec![
         Line::from(""),
         Line::from(vec![
@@ -418,9 +546,20 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
                 .border_style(Style::default().fg(DIM)),
         )
         .wrap(Wrap { trim: false });
-    f.render_widget(bio, cols[0]);
+    f.render_widget(bio, left_chunks[0]);
 
-    // Right: dynamic stats / simulated CPU monitor
+    render_shell_simulator(f, left_chunks[1], app, accent);
+
+    // Right: dynamic stats / simulated CPU monitor (top) & Page Table Allocation Map (bottom)
+    let box_width = cols[1].width as usize;
+    let is_wide = box_width >= 40;
+
+    let bar_width = if is_wide {
+        ((box_width - 24) / 2).clamp(3, 10)
+    } else {
+        (box_width - 15).clamp(3, 15)
+    };
+
     let mut stats_lines = vec![
         Line::from(""),
         Line::from(vec![
@@ -436,18 +575,8 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
             Span::styled("PyTorch · OpenCV · TensorRT", Style::default().fg(FG)),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  ┌─ CPU Monitor ───────────────────────┐", Style::default().fg(accent))),
+        Line::from(Span::styled("  ┌─ Core Status ───────────────────────┐", Style::default().fg(accent))),
     ];
-
-    let box_width = cols[1].width as usize;
-    let is_wide = box_width >= 40;
-
-    // Choose progress bar width dynamically to fit screen size
-    let bar_width = if is_wide {
-        ((box_width - 24) / 2).clamp(3, 10)
-    } else {
-        (box_width - 15).clamp(3, 15)
-    };
 
     if is_wide {
         // Render 2 columns: 4 rows of 2 cores
@@ -460,7 +589,6 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
             let left_str = format!("C{} [", i + 1);
             let right_str = format!("C{} [", i + 2);
             
-            // Render nice color segments
             stats_lines.push(Line::from(vec![
                 Span::styled("  │ ", Style::default().fg(accent)),
                 Span::styled(left_str, Style::default().fg(DIM)),
@@ -474,8 +602,8 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
             ]));
         }
     } else {
-        // Render 1 column: 8 rows (or fewer if height is restricted)
-        let max_rows = (cols[1].height as usize).saturating_sub(8).min(8).max(4);
+        // Render 1 column: 4 cores to prevent overflow
+        let max_rows = 4;
         for i in 0..max_rows {
             let cpu = app.cpu_cores.get(i).copied().unwrap_or(0.0);
             let bar = make_progress_bar(cpu, bar_width);
@@ -489,6 +617,27 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
             ]));
         }
     }
+
+    // GPU and VRAM info
+    let gpu_bar = make_progress_bar(app.gpu_load, bar_width);
+    let gpu_str = format!("GPU [{}] {:>2.0}%", gpu_bar, app.gpu_load);
+    let gpu_padding = box_width.saturating_sub(gpu_str.len() + 6);
+    stats_lines.push(Line::from(vec![
+        Span::styled("  │ ", Style::default().fg(accent)),
+        Span::styled(gpu_str, Style::default().fg(Color::Yellow)),
+        Span::styled(" ".repeat(gpu_padding), Style::default()),
+        Span::styled(" │", Style::default().fg(accent)),
+    ]));
+
+    let vram_bar = make_progress_bar((app.vram_usage / 8.0) * 100.0, bar_width);
+    let vram_str = format!("VRM [{}] {:.2}G/8G", vram_bar, app.vram_usage);
+    let vram_padding = box_width.saturating_sub(vram_str.len() + 6);
+    stats_lines.push(Line::from(vec![
+        Span::styled("  │ ", Style::default().fg(accent)),
+        Span::styled(vram_str, Style::default().fg(Color::Magenta)),
+        Span::styled(" ".repeat(vram_padding), Style::default()),
+        Span::styled(" │", Style::default().fg(accent)),
+    ]));
 
     // Average CPU usage
     let avg_cpu: f64 = app.cpu_cores.iter().sum::<f64>() / 8.0;
@@ -532,21 +681,124 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     ]));
 
     stats_lines.push(Line::from(Span::styled("  └─────────────────────────────────────┘", Style::default().fg(accent))));
-    stats_lines.push(Line::from(""));
-    stats_lines.push(Line::from(Span::styled(
-        "   ↹ tab / ← → to navigate  │  q to quit",
-        Style::default().fg(DIM),
-    )));
 
     let stats = Paragraph::new(stats_lines)
         .block(
             Block::default()
-                .title(Span::styled(" sys-info ", Style::default().fg(DIM)))
+                .title(Span::styled(" system status ", Style::default().fg(DIM)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(DIM)),
         );
-    f.render_widget(stats, cols[1]);
+    f.render_widget(stats, right_chunks[0]);
+
+    render_page_table(f, right_chunks[1], app, accent);
+}
+
+fn render_shell_simulator(f: &mut Frame, area: Rect, app: &App, accent: Color) {
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("arnav@host:~$ ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled("system_diagnostic", Style::default().fg(FG)),
+        ]),
+        Line::from(Span::styled("Diagnostic module loaded.", Style::default().fg(DIM))),
+        Line::from(""),
+    ];
+    
+    let (cmd_full, _) = &app.shell_cmds[app.shell_cmd_idx];
+    let typed = if app.shell_char_idx <= cmd_full.len() {
+        &cmd_full[0..app.shell_char_idx]
+    } else {
+        cmd_full
+    };
+    
+    // Draw past output lines
+    for line in &app.shell_output {
+        lines.push(Line::from(Span::raw(line)));
+    }
+    
+    // Draw the current active prompt
+    if app.shell_state == ShellState::Typing {
+        let cursor_char = if app.tick_count % 10 < 5 { "█" } else { " " };
+        lines.push(Line::from(vec![
+            Span::styled("arnav@host:~$ ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(typed.to_string(), Style::default().fg(FG)),
+            Span::styled(cursor_char, Style::default().fg(accent)),
+        ]));
+    } else {
+        lines.push(Line::from(vec![
+            Span::styled("arnav@host:~$ ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled((*cmd_full).to_string(), Style::default().fg(FG)),
+        ]));
+    }
+    
+    // Scroll to show latest lines to prevent overflow
+    let max_lines = area.height.saturating_sub(2) as usize;
+    let start_idx = lines.len().saturating_sub(max_lines);
+    let visible_lines = lines[start_idx..].to_vec();
+    
+    let shell = Paragraph::new(visible_lines)
+        .block(
+            Block::default()
+                .title(Span::styled(" active shell ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)),
+        );
+    f.render_widget(shell, area);
+}
+
+fn render_page_table(f: &mut Frame, area: Rect, app: &App, _accent: Color) {
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Legend: ", Style::default().fg(DIM)),
+            Span::styled(". ", Style::default().fg(Color::DarkGray)), Span::styled("Free ", Style::default().fg(DIM)),
+            Span::styled("■ ", Style::default().fg(Color::Green)), Span::styled("Alloc ", Style::default().fg(DIM)),
+            Span::styled("▩ ", Style::default().fg(Color::Yellow)), Span::styled("Dirty ", Style::default().fg(DIM)),
+            Span::styled("▨ ", Style::default().fg(Color::LightRed)), Span::styled("Locked ", Style::default().fg(DIM)),
+        ]),
+        Line::from(""),
+    ];
+    
+    // Render the 8x8 memory matrix
+    for row in 0..8 {
+        let mut row_spans = vec![
+            Span::styled("  PAGE_TABLE:  ", Style::default().fg(DIM)),
+        ];
+        for col in 0..8 {
+            let idx = row * 8 + col;
+            let ch = app.page_table.get(idx).copied().unwrap_or('.');
+            let (symbol, color) = match ch {
+                'A' => ("■ ", Color::Green),
+                'D' => ("▩ ", Color::Yellow),
+                'R' => ("▨ ", Color::LightRed),
+                _   => (". ", Color::DarkGray),
+            };
+            row_spans.push(Span::styled(symbol, Style::default().fg(color)));
+        }
+        lines.push(Line::from(row_spans));
+    }
+    
+    lines.push(Line::from(""));
+    
+    let active_pages = app.page_table.iter().filter(|&&c| c != '.').count();
+    let usage_pct = (active_pages as f64 / 64.0) * 100.0;
+    lines.push(Line::from(vec![
+        Span::styled("  Memory Used: ", Style::default().fg(DIM)),
+        Span::styled(format!("{:.1}% ", usage_pct), Style::default().fg(Color::LightBlue)),
+        Span::styled(format!("({}/64 pages allocated)", active_pages), Style::default().fg(DIM)),
+    ]));
+    
+    let memory_block = Paragraph::new(lines)
+        .block(
+            Block::default()
+                .title(Span::styled(" page allocation map ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)),
+        );
+    f.render_widget(memory_block, area);
 }
 
 // ─── Tab: Projects ───────────────────────────────────────────────────────────
