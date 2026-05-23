@@ -10,7 +10,7 @@ use ratatui::backend::CrosstermBackend;
 #[cfg(target_arch = "wasm32")]
 use ratzilla::{
     event::KeyCode,
-    DomBackend,
+    CanvasBackend,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -335,7 +335,32 @@ use ratzilla::WebRenderer;
 fn main() -> Result<(), Box<dyn Error>> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app = Rc::new(RefCell::new(App::new()));
-    let backend = DomBackend::new_by_id("terminal-container")?;
+
+    let window = web_sys::window().unwrap();
+    let init_closure = Closure::wrap(Box::new({
+        let app = app.clone();
+        move || {
+            if let Err(e) = init_app(app.clone()) {
+                web_sys::console::error_1(&format!("Failed to initialize app: {:?}", e).into());
+            }
+        }
+    }) as Box<dyn FnMut()>);
+
+    window.set_timeout_with_callback_and_timeout_and_arguments_0(
+        init_closure.as_ref().unchecked_ref(),
+        100, // 100ms delay to ensure browser layout computes
+    ).unwrap();
+
+    init_closure.forget();
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
+    let backend = CanvasBackend::new_with_options(
+        ratzilla::backend::canvas::CanvasBackendOptions::new()
+            .grid_id("terminal-container")
+    )?;
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({
@@ -376,7 +401,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     ).unwrap();
 
     closure.forget();
-
     Ok(())
 }
 
