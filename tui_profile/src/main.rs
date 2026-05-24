@@ -385,6 +385,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 #[cfg(target_arch = "wasm32")]
+fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+    web_sys::window()
+        .unwrap()
+        .request_animation_frame(f.as_ref().unchecked_ref())
+        .unwrap();
+}
+
+#[cfg(target_arch = "wasm32")]
 fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
     setup_fullscreen_click();
     let backend = CanvasBackend::new_with_options(
@@ -416,27 +424,49 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
     });
 
     let terminal = Rc::new(RefCell::new(terminal));
-    let closure = Closure::wrap(Box::new({
-        let terminal = terminal.clone();
-        let app = app.clone();
+    let last_time = Rc::new(RefCell::new(Instant::now()));
+    let accumulator = Rc::new(RefCell::new(0.0));
+
+    let f = Rc::new(RefCell::new(None));
+    let g = f.clone();
+
+    let app_inner = app.clone();
+    let terminal_inner = terminal.clone();
+
+    *g.borrow_mut() = Some(Closure::wrap(Box::new({
+        let last_time = last_time.clone();
+        let accumulator = accumulator.clone();
+        let f = f.clone();
         move || {
-            let mut app = app.borrow_mut();
+            let now = Instant::now();
+            let mut elapsed = now.duration_since(*last_time.borrow()).as_secs_f64();
+            *last_time.borrow_mut() = now;
+
+            if elapsed > 0.25 {
+                elapsed = 0.25;
+            }
+
+            *accumulator.borrow_mut() += elapsed;
+
+            let timestep = 1.0 / 60.0;
+            let mut app = app_inner.borrow_mut();
             app.fps_tracker.update();
-            app.tick();
-            let mut term = terminal.borrow_mut();
-            term.draw(|f| {
-                ui(f, &app);
+
+            while *accumulator.borrow_mut() >= timestep {
+                app.tick();
+                *accumulator.borrow_mut() -= timestep;
+            }
+
+            let mut term = terminal_inner.borrow_mut();
+            term.draw(|frame| {
+                ui(frame, &app);
             }).unwrap();
+
+            request_animation_frame(f.borrow().as_ref().unwrap());
         }
-    }) as Box<dyn FnMut()>);
+    }) as Box<dyn FnMut()>));
 
-    let window = web_sys::window().unwrap();
-    window.set_interval_with_callback_and_timeout_and_arguments_0(
-        closure.as_ref().unchecked_ref(),
-        8, // 8ms (approx 120 FPS)
-    ).unwrap();
-
-    closure.forget();
+    request_animation_frame(g.borrow().as_ref().unwrap());
     Ok(())
 }
 
