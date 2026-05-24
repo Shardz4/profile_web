@@ -310,7 +310,7 @@ where
         if event::poll(Duration::from_millis(8))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                    KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
                     KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
                     KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => app.prev_tab(),
                     KeyCode::Char('1') => app.tab_index = 0,
@@ -327,9 +327,38 @@ where
 #[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{prelude::Closure, JsCast};
+use wasm_bindgen::{prelude::Closure, JsCast, prelude::wasm_bindgen};
 #[cfg(target_arch = "wasm32")]
 use ratzilla::WebRenderer;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(inline_js = r#"
+    export function request_fullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen().catch(err => {
+                console.warn("Fullscreen request rejected:", err);
+            });
+        }
+    }
+    export function exit_fullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen().catch(err => {
+                console.warn("Exit fullscreen failed:", err);
+            });
+        }
+    }
+    export function setup_fullscreen_click() {
+        document.addEventListener('click', () => {
+            request_fullscreen();
+        }, { once: false });
+    }
+"#)]
+extern "C" {
+    fn request_fullscreen();
+    fn exit_fullscreen();
+    fn setup_fullscreen_click();
+}
 
 #[cfg(target_arch = "wasm32")]
 fn main() -> Result<(), Box<dyn Error>> {
@@ -357,6 +386,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 #[cfg(target_arch = "wasm32")]
 fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
+    setup_fullscreen_click();
     let backend = CanvasBackend::new_with_options(
         ratzilla::backend::canvas::CanvasBackendOptions::new()
             .grid_id("terminal-container")
@@ -374,6 +404,12 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                 KeyCode::Char('2') => app.tab_index = 1,
                 KeyCode::Char('3') => app.tab_index = 2,
                 KeyCode::Char('4') => app.tab_index = 3,
+                KeyCode::Char('f') | KeyCode::Char('F') => {
+                    request_fullscreen();
+                }
+                KeyCode::Char('q') | KeyCode::Char('Q') => {
+                    exit_fullscreen();
+                }
                 _ => {}
             }
         }
@@ -1076,7 +1112,13 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled("1-4 ", Style::default().fg(accent)),
         Span::styled("jump", Style::default().fg(DIM)),
         Span::styled("  │  ", Style::default().fg(DIM)),
+        Span::styled("f ", Style::default().fg(accent)),
+        Span::styled("fullscreen", Style::default().fg(DIM)),
+        Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled("q ", Style::default().fg(accent)),
+        #[cfg(target_arch = "wasm32")]
+        Span::styled("exit fullscreen", Style::default().fg(DIM)),
+        #[cfg(not(target_arch = "wasm32"))]
         Span::styled("quit", Style::default().fg(DIM)),
         Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled(format!("FPS: {:.1}", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
