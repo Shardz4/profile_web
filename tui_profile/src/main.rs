@@ -662,9 +662,9 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     // 4. Centered Boot Interactive prompt
     let blink = app.tick_count % 20 < 10;
     let prompt_text = if blink {
-        " ▸ ▸ ▸  [ CLICK ANYWHERE TO BOOT SYSTEM ]  ◂ ◂ ◂ "
+        " ▸ ▸ ▸  [ CLICK ANYWHERE TO CONTINUE ]  ◂ ◂ ◂ "
     } else {
-        "        [ CLICK ANYWHERE TO BOOT SYSTEM ]        "
+        "        [ CLICK ANYWHERE TO CONTINUE]        "
     };
 
     let prompt = Paragraph::new(Line::from(vec![
