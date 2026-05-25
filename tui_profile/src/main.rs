@@ -543,7 +543,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     // 1. Render Header
     let header_lines = vec![
         Line::from(vec![
-            Span::styled(" ▸ SYSTEM DIAGNOSTICS & RETRO TUI MONITOR ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+            Span::styled(" ▸ ARNAV SHARMA PORTFOLIO ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
             Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
         ]),
         Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))),
