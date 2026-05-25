@@ -664,7 +664,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     let prompt_text = if blink {
         " ▸ ▸ ▸  [ CLICK ANYWHERE TO CONTINUE ]  ◂ ◂ ◂ "
     } else {
-        "        [ CLICK ANYWHERE TO CONTINUE]        "
+        "        [ CLICK ANYWHERE TO CONTINUE ]        "
     };
 
     let prompt = Paragraph::new(Line::from(vec![
