@@ -20,7 +20,8 @@ mod platform {
         layout::{Alignment, Constraint, Direction, Layout, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap},
+        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType},
+        symbols::Marker,
         Frame, Terminal,
     };
     pub type Instant = std::time::Instant;
@@ -33,7 +34,8 @@ mod platform {
         layout::{Alignment, Constraint, Direction, Layout, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap},
+        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType},
+        symbols::Marker,
         Frame, Terminal,
     };
     pub type Instant = web_time::Instant;
@@ -103,6 +105,8 @@ struct App {
     pub shell_state: ShellState,
     pub shell_output: Vec<String>,
     pub shell_wait_ticks: u32,
+    pub boot_mode: bool,
+    pub sparkline_data: Vec<u64>,
 }
 
 impl App {
@@ -177,6 +181,8 @@ impl App {
             shell_state: ShellState::Typing,
             shell_output: Vec::new(),
             shell_wait_ticks: 0,
+            boot_mode: true,
+            sparkline_data: vec![0; 100],
         }
     }
     pub fn next_tab(&mut self) {
@@ -192,6 +198,14 @@ impl App {
     pub fn tick(&mut self) {
         self.tick_count += 1;
         
+        // Update sparkline data
+        let t_spark = self.tick_count as f64 * 0.15;
+        let spark_val = (50.0 + 35.0 * t_spark.sin() + 10.0 * (t_spark * 2.3).cos()).clamp(0.0, 99.0) as u64;
+        self.sparkline_data.push(spark_val);
+        if self.sparkline_data.len() > 100 {
+            self.sparkline_data.remove(0);
+        }
+
         // 1. Update simulated CPU cores loads using sine waves and pseudo-random noise
         let t = self.tick_count as f64 * 0.04;
         self.cpu_cores.clear();
@@ -309,15 +323,25 @@ where
 
         if event::poll(Duration::from_millis(8))? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
-                    KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => app.prev_tab(),
-                    KeyCode::Char('1') => app.tab_index = 0,
-                    KeyCode::Char('2') => app.tab_index = 1,
-                    KeyCode::Char('3') => app.tab_index = 2,
-                    KeyCode::Char('4') => app.tab_index = 3,
-                    _ => {}
+                if app.boot_mode {
+                    match key.code {
+                        KeyCode::Enter | KeyCode::Char(' ') => {
+                            app.boot_mode = false;
+                        }
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
+                        _ => {}
+                    }
+                } else {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
+                        KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
+                        KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => app.prev_tab(),
+                        KeyCode::Char('1') => app.tab_index = 0,
+                        KeyCode::Char('2') => app.tab_index = 1,
+                        KeyCode::Char('3') => app.tab_index = 2,
+                        KeyCode::Char('4') => app.tab_index = 3,
+                        _ => {}
+                    }
                 }
             }
         }
@@ -349,21 +373,19 @@ use ratzilla::WebRenderer;
         }
     }
     export function setup_fullscreen_click() {
-        const overlay = document.getElementById('boot-overlay');
-        const launchBtn = document.getElementById('launch-btn');
-        if (overlay && launchBtn) {
-            launchBtn.addEventListener('click', () => {
-                request_fullscreen();
-                overlay.classList.add('fade-out');
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                }, 500);
+        document.addEventListener('click', () => {
+            request_fullscreen();
+            const event = new KeyboardEvent('keydown', {
+                key: 'Enter',
+                code: 'Enter',
+                keyCode: 13,
+                which: 13,
+                bubbles: true,
+                cancelable: true
             });
-        } else {
-            document.addEventListener('click', () => {
-                request_fullscreen();
-            }, { once: true });
-        }
+            window.dispatchEvent(event);
+            document.dispatchEvent(event);
+        }, { once: true });
     }
 "#)]
 extern "C" {
@@ -417,20 +439,32 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
         let app = app.clone();
         move |key_event| {
             let mut app = app.borrow_mut();
-            match key_event.code {
-                KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
-                KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
-                KeyCode::Char('1') => app.tab_index = 0,
-                KeyCode::Char('2') => app.tab_index = 1,
-                KeyCode::Char('3') => app.tab_index = 2,
-                KeyCode::Char('4') => app.tab_index = 3,
-                KeyCode::Char('f') | KeyCode::Char('F') => {
-                    request_fullscreen();
+            if app.boot_mode {
+                match key_event.code {
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        app.boot_mode = false;
+                    }
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        exit_fullscreen();
+                    }
+                    _ => {}
                 }
-                KeyCode::Char('q') | KeyCode::Char('Q') => {
-                    exit_fullscreen();
+            } else {
+                match key_event.code {
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
+                    KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
+                    KeyCode::Char('1') => app.tab_index = 0,
+                    KeyCode::Char('2') => app.tab_index = 1,
+                    KeyCode::Char('3') => app.tab_index = 2,
+                    KeyCode::Char('4') => app.tab_index = 3,
+                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                        request_fullscreen();
+                    }
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        exit_fullscreen();
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     });
@@ -460,7 +494,7 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
 
             *accumulator.borrow_mut() += elapsed;
 
-            let timestep = 1.0 / 60.0;
+            let timestep = 1.0 / 120.0;
             let mut app = app_inner.borrow_mut();
             app.fps_tracker.update();
 
@@ -482,10 +516,175 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// ─── Boot UI Screen ──────────────────────────────────────────────────────────
+fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
+    let size = f.area();
+
+    // Draw outer double borders
+    let outer = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(accent))
+        .style(Style::default().bg(BG));
+    f.render_widget(outer, size);
+
+    // Dynamic grid layout
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(2)
+        .constraints([
+            Constraint::Length(3),  // Header / Title
+            Constraint::Min(0),     // Middle Widgets (BarChart & Chart)
+            Constraint::Length(7),  // Sparkline
+            Constraint::Length(3),  // Boot Button / Prompt
+        ])
+        .split(size);
+
+    // 1. Render Header
+    let header_lines = vec![
+        Line::from(vec![
+            Span::styled(" ▸ SYSTEM DIAGNOSTICS & RETRO TUI MONITOR ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))),
+    ];
+    let header = Paragraph::new(header_lines).alignment(Alignment::Center);
+    f.render_widget(header, main_chunks[0]);
+
+    // 2. Middle Row: BarChart & Dual Sine Chart
+    let mid_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(50), // BarChart
+            Constraint::Percentage(50), // Chart (Sinusoidal axis)
+        ])
+        .split(main_chunks[1]);
+
+    // 2a. BarChart Data (animated via tick_count)
+    let bar_values: Vec<u64> = (0..12).map(|i| {
+        let t = app.tick_count as f64 * 0.12;
+        let base = 50.0 + 40.0 * (t + i as f64 * 0.6).sin();
+        let noise = ((app.tick_count + i as u64) % 7) as f64;
+        (base + noise).clamp(5.0, 95.0) as u64
+    }).collect();
+
+    let bar_data = [
+        ("C1", bar_values[0]),
+        ("C2", bar_values[1]),
+        ("C3", bar_values[2]),
+        ("C4", bar_values[3]),
+        ("C5", bar_values[4]),
+        ("C6", bar_values[5]),
+        ("C7", bar_values[6]),
+        ("C8", bar_values[7]),
+        ("C9", bar_values[8]),
+        ("CA", bar_values[9]),
+        ("CB", bar_values[10]),
+        ("CC", bar_values[11]),
+    ];
+
+    let barchart = BarChart::default()
+        .block(Block::default()
+            .title(Span::styled(" core voltages (120hz) ", Style::default().fg(DIM)))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(DIM)))
+        .data(&bar_data)
+        .bar_width(3)
+        .bar_gap(1)
+        .value_style(Style::default().fg(Color::Black).bg(accent))
+        .bar_style(Style::default().fg(accent));
+    f.render_widget(barchart, mid_chunks[0]);
+
+    // 2b. Dual Sine Chart Data (animated via tick_count)
+    let t = app.tick_count as f64 * 0.08;
+    let mut wave1 = Vec::new();
+    let mut wave2 = Vec::new();
+    for i in 0..60 {
+        let x = (i as f64) * 0.25;
+        let y1 = (x - t).sin();
+        let y2 = (1.5 * x + t).cos() * 0.8;
+        wave1.push((x, y1));
+        wave2.push((x, y2));
+    }
+
+    let dataset1 = Dataset::default()
+        .name("SIG_A (sin)")
+        .marker(Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Cyan))
+        .data(&wave1);
+
+    let dataset2 = Dataset::default()
+        .name("SIG_B (cos)")
+        .marker(Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(Style::default().fg(Color::Magenta))
+        .data(&wave2);
+
+    let chart = Chart::new(vec![dataset1, dataset2])
+        .block(Block::default()
+            .title(Span::styled(" sinusoidal phase telemetry ", Style::default().fg(DIM)))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(DIM)))
+        .x_axis(Axis::default()
+            .title("Time Phase")
+            .style(Style::default().fg(DIM))
+            .bounds([0.0, 15.0])
+            .labels(vec![
+                Span::styled("0", Style::default().fg(DIM)),
+                Span::styled("7.5", Style::default().fg(DIM)),
+                Span::styled("15", Style::default().fg(DIM)),
+            ]))
+        .y_axis(Axis::default()
+            .title("Amp")
+            .style(Style::default().fg(DIM))
+            .bounds([-1.2, 1.2])
+            .labels(vec![
+                Span::styled("-1.0", Style::default().fg(DIM)),
+                Span::styled("0", Style::default().fg(DIM)),
+                Span::styled("1.0", Style::default().fg(DIM)),
+            ]));
+    f.render_widget(chart, mid_chunks[1]);
+
+    // 3. Sparkline Widget
+    let sparkline = Sparkline::default()
+        .block(Block::default()
+            .title(Span::styled(" frequency spectrum analytics (120hz) ", Style::default().fg(DIM)))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(DIM)))
+        .data(&app.sparkline_data)
+        .style(Style::default().fg(Color::Yellow));
+    f.render_widget(sparkline, main_chunks[2]);
+
+    // 4. Centered Boot Interactive prompt
+    let blink = app.tick_count % 20 < 10;
+    let prompt_text = if blink {
+        " ▸ ▸ ▸  [ CLICK ANYWHERE TO BOOT SYSTEM ]  ◂ ◂ ◂ "
+    } else {
+        "        [ CLICK ANYWHERE TO BOOT SYSTEM ]        "
+    };
+
+    let prompt = Paragraph::new(Line::from(vec![
+        Span::styled(prompt_text, Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+    ]))
+    .block(Block::default()
+        .borders(Borders::NONE))
+    .alignment(Alignment::Center);
+    f.render_widget(prompt, main_chunks[3]);
+}
+
 // ─── Root UI ────────────────────────────────────────────────────────────────
 fn ui(f: &mut Frame, app: &App) {
     let size = f.area();
     let accent = app.get_accent_color();
+
+    if app.boot_mode {
+        render_boot_screen(f, app, accent);
+        return;
+    }
 
     // Outer chrome
     let outer = Block::default()
