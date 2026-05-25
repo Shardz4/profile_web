@@ -349,9 +349,21 @@ use ratzilla::WebRenderer;
         }
     }
     export function setup_fullscreen_click() {
-        document.addEventListener('click', () => {
-            request_fullscreen();
-        }, { once: false });
+        const overlay = document.getElementById('boot-overlay');
+        const launchBtn = document.getElementById('launch-btn');
+        if (overlay && launchBtn) {
+            launchBtn.addEventListener('click', () => {
+                request_fullscreen();
+                overlay.classList.add('fade-out');
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 500);
+            });
+        } else {
+            document.addEventListener('click', () => {
+                request_fullscreen();
+            }, { once: true });
+        }
     }
 "#)]
 extern "C" {
