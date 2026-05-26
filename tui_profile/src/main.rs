@@ -704,7 +704,7 @@ fn ui(f: &mut Frame, app: &App) {
             Constraint::Length(3), // header
             Constraint::Length(3), // tabs
             Constraint::Min(0),    // body
-            Constraint::Length(2), // footer
+            Constraint::Length(3), // footer
         ])
         .split(size);
 
@@ -1351,8 +1351,8 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Top line (for Mario to jump on)
-            Constraint::Length(1), // Bottom line (for help text)
+            Constraint::Length(2), // Space for Mario running/jumping
+            Constraint::Length(1), // Bottom line for help text
         ])
         .split(area);
 
@@ -1389,13 +1389,13 @@ pub struct MarioWidget {
 
 impl Widget for MarioWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.height < 2 {
+        if area.height < 3 {
             return;
         }
 
         let width = area.width as usize;
-        let period = 400; // Ticks between runs
-        let speed = 1;    // Ticks per column move
+        let period = 600; // Ticks between runs (5 seconds at 120Hz)
+        let speed = 3;    // Ticks per column move (slower, ~40 columns/sec)
         let run_ticks = width * speed;
         let cycle_tick = (self.tick_count % period) as usize;
 
@@ -1406,34 +1406,53 @@ impl Widget for MarioWidget {
             let x_mod = x % 35;
             let is_jumping = x_mod >= 12 && x_mod <= 20;
 
+            // Running: Cap on Line 1, Body on Line 2
+            // Jumping: Cap on Line 0, Body on Line 1
             let draw_y = if is_jumping {
                 area.top()
             } else {
                 area.top() + 1
             };
 
-            let frame = (self.tick_count / 3) % 3; // leg animation frame
+            let frame = (self.tick_count / 8) % 3; // leg animation speed matches slower movement
 
-            let leg_char = if is_jumping {
-                "^"
-            } else {
-                match frame {
-                    0 => "\\",
-                    1 => "|",
-                    _ => "/",
-                }
-            };
-
-            let cap_style = Style::default().fg(Color::Red).add_modifier(Modifier::BOLD);
             let body_style = Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD);
-            let legs_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+            let limbs_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
 
             let draw_x = area.left() + x as u16;
 
             if draw_x + 2 < area.right() {
-                buf.set_string(draw_x, draw_y, "o", cap_style);
-                buf.set_string(draw_x + 1, draw_y, "M", body_style);
-                buf.set_string(draw_x + 2, draw_y, leg_char, legs_style);
+                // Draw top line (hat)
+                buf.set_string(
+                    draw_x + 1,
+                    draw_y,
+                    "▲",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                );
+
+                // Draw bottom line (body & limbs)
+                if is_jumping {
+                    buf.set_string(draw_x, draw_y + 1, "\\", limbs_style);
+                    buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
+                    buf.set_string(draw_x + 2, draw_y + 1, "^", limbs_style);
+                } else {
+                    match frame {
+                        0 => {
+                            buf.set_string(draw_x, draw_y + 1, "\\", limbs_style);
+                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
+                            buf.set_string(draw_x + 2, draw_y + 1, "/", limbs_style);
+                        }
+                        1 => {
+                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
+                            buf.set_string(draw_x + 2, draw_y + 1, "|", limbs_style);
+                        }
+                        _ => {
+                            buf.set_string(draw_x, draw_y + 1, "/", limbs_style);
+                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
+                            buf.set_string(draw_x + 2, draw_y + 1, "\\", limbs_style);
+                        }
+                    }
+                }
             }
         }
     }
