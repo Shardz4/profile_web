@@ -662,6 +662,14 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     f.render_widget(sparkline, main_chunks[2]);
 
     // 4. Centered Boot Interactive prompt
+    let boot_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2), // Space for Mario running/jumping
+            Constraint::Length(1), // Bottom line for prompt text
+        ])
+        .split(main_chunks[3]);
+
     let blink = app.tick_count % 20 < 10;
     let prompt_text = if blink {
         " ▸ ▸ ▸  [ CLICK ANYWHERE TO CONTINUE ]  ◂ ◂ ◂ "
@@ -675,7 +683,11 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     .block(Block::default()
         .borders(Borders::NONE))
     .alignment(Alignment::Center);
-    f.render_widget(prompt, main_chunks[3]);
+    f.render_widget(prompt, boot_chunks[1]);
+
+    // Render Mario running and jumping across the boot prompt area!
+    let mario = MarioWidget { tick_count: app.tick_count };
+    f.render_widget(mario, main_chunks[3]);
 }
 
 // ─── Root UI ────────────────────────────────────────────────────────────────
@@ -704,7 +716,7 @@ fn ui(f: &mut Frame, app: &App) {
             Constraint::Length(3), // header
             Constraint::Length(3), // tabs
             Constraint::Min(0),    // body
-            Constraint::Length(3), // footer
+            Constraint::Length(1), // footer
         ])
         .split(size);
 
@@ -1348,14 +1360,6 @@ fn render_contact(f: &mut Frame, area: Rect, accent: Color) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2), // Space for Mario running/jumping
-            Constraint::Length(1), // Bottom line for help text
-        ])
-        .split(area);
-
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" ← → ", Style::default().fg(accent)),
         Span::styled("navigate", Style::default().fg(DIM)),
@@ -1375,11 +1379,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled(format!("FPS: {:.1}", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
     ]))
     .alignment(Alignment::Center);
-    f.render_widget(footer, chunks[1]);
-
-    // Render Mario running and jumping across the footer!
-    let mario = MarioWidget { tick_count: app.tick_count };
-    f.render_widget(mario, area);
+    f.render_widget(footer, area);
 }
 
 // ─── Custom Mario TUI Widget ─────────────────────────────────────────────────
