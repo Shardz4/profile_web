@@ -538,7 +538,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
             Constraint::Length(3),  // Header / Title
             Constraint::Min(0),     // Middle Widgets (BarChart & Chart)
             Constraint::Length(6),  // Sparkline
-            Constraint::Length(10), // Mario + Boot Button
+            Constraint::Length(14), // Mario + Boot Button
         ])
         .split(size);
 
@@ -665,8 +665,8 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     let boot_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(8), // Space for Mario running/jumping
-            Constraint::Length(2), // Bottom lines for prompt text
+            Constraint::Length(12), // Space for Mario running/jumping
+            Constraint::Length(2),  // Bottom lines for prompt text
         ])
         .split(main_chunks[3]);
 
@@ -687,7 +687,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
 
     // Render Mario running and jumping across the boot prompt area!
     let mario = MarioWidget { tick_count: app.tick_count };
-    f.render_widget(mario, main_chunks[3]);
+    f.render_widget(mario, boot_chunks[0]);
 }
 
 // ─── Root UI ────────────────────────────────────────────────────────────────
@@ -1389,15 +1389,15 @@ pub struct MarioWidget {
 
 impl Widget for MarioWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.height < 9 {
+        if area.height < 8 {
             return;
         }
 
         let width = area.width as usize;
-        let period = 600; // Ticks between runs
-        let speed = 3;    // Ticks per column move
+        let speed = 4;    // Ticks per column move
         let run_ticks = width * speed;
-        let cycle_tick = (self.tick_count % period) as usize;
+        let period = run_ticks + 200; // Dynamic period with pause between runs
+        let cycle_tick = (self.tick_count % period as u64) as usize;
 
         if cycle_tick < run_ticks {
             let x = cycle_tick / speed;
@@ -1406,19 +1406,28 @@ impl Widget for MarioWidget {
             let x_mod = x % 45;
             let is_jumping = x_mod >= 15 && x_mod <= 25;
 
-            // Calculate vertical offset (0 for jumping, 2 for running)
-            let dy = if is_jumping { 0 } else { 2 };
+            // Parabolic jump offset (up to 4 rows high, fitting within the 12-row viewport)
+            let dy_j = if is_jumping {
+                let t = (x_mod - 15) as f64;
+                (0.16 * t * (10.0 - t)).round() as u16
+            } else {
+                0
+            };
+
+            // base_y is area.height - 8, so Mario's bottom is exactly at area.height - 1 (top of "Click to continue")
+            let base_y = area.height.saturating_sub(8);
+            let dy = base_y.saturating_sub(dy_j);
 
             let start_x = area.left() + x as u16;
             let start_y = area.top() + dy;
 
-            let frame = (self.tick_count / 8) % 2; // running frame index
+            let frame = (self.tick_count / 8) % 2; // running leg frame index
 
-            // NES Mario 16x12 pixel art color mappings
+            // NES Small Mario 12x16 pixel art color mappings
             let r_color = Color::Rgb(228, 0, 15);   // Red
-            let g_color = Color::Rgb(90, 104, 0);    // Green/Olive shirt/shoes/hair
+            let g_color = Color::Rgb(90, 104, 0);    // Green/Olive
             let p_color = Color::Rgb(255, 166, 0);   // Peach/Skin
-            let y_color = Color::Rgb(255, 199, 44);  // Yellow overalls buttons
+            let y_color = Color::Rgb(255, 199, 44);  // Yellow/Gold overalls buttons
 
             let mut grid = [
                 ['.', '.', '.', 'R', 'R', 'R', 'R', 'R', 'R', '.', '.', '.'],
@@ -1428,25 +1437,24 @@ impl Widget for MarioWidget {
                 ['.', 'G', 'P', 'G', 'G', 'P', 'P', 'P', 'G', 'P', 'P', 'P'],
                 ['.', 'G', 'G', 'P', 'P', 'P', 'P', 'G', 'G', 'G', 'G', '.'],
                 ['.', '.', '.', 'P', 'P', 'P', 'P', 'P', 'P', 'P', '.', '.'],
-                ['.', '.', 'G', 'G', 'R', 'G', 'G', 'G', 'G', '.', '.', '.'],
+                ['.', '.', '.', 'G', 'R', 'G', 'G', 'G', '.', '.', '.', '.'],
                 ['.', 'G', 'G', 'G', 'R', 'G', 'G', 'R', 'G', 'G', 'G', '.'],
-                ['G', 'G', 'G', 'G', 'R', 'R', 'R', 'R', 'G', 'G', 'G', 'G'],
+                ['G', 'G', 'G', 'G', 'R', 'G', 'G', 'R', 'G', 'G', 'G', 'G'],
                 ['P', 'P', 'G', 'R', 'Y', 'R', 'R', 'Y', 'R', 'G', 'P', 'P'],
                 ['P', 'P', 'P', 'R', 'R', 'R', 'R', 'R', 'R', 'P', 'P', 'P'],
-                ['.', '.', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', '.', '.'],
-                // legs change on frame 1:
-                ['.', '.', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', '.', '.'],
-                ['.', 'G', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', 'G', '.'],
+                ['P', 'P', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'P', 'P'],
+                ['.', '.', 'R', 'R', 'R', '.', '.', 'R', 'R', 'R', '.', '.'],
+                ['.', 'G', 'G', 'G', '.', '.', '.', '.', 'G', 'G', 'G', '.'],
                 ['G', 'G', 'G', 'G', '.', '.', '.', '.', 'G', 'G', 'G', 'G'],
             ];
 
             if frame == 1 && !is_jumping {
-                grid[13] = ['.', '.', '.', 'G', 'G', '.', '.', 'G', 'G', '.', '.', '.'];
-                grid[14] = ['.', '.', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', '.', '.'];
-                grid[15] = ['.', 'G', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', 'G', '.'];
+                // Animate walking legs by tucking/shifting bottom shoe pixels
+                grid[14] = ['.', '.', 'G', 'G', 'G', '.', '.', '.', 'G', 'G', '.', '.'];
+                grid[15] = ['.', '.', '.', 'G', 'G', 'G', '.', '.', '.', 'G', 'G', '.'];
             }
 
-            // Render the grid double-pixel style
+            // Render the grid double-pixel style (8 cells high, 12 columns wide)
             for cell_y in 0..8 {
                 for col in 0..12 {
                     let p_top = grid[cell_y * 2][col];
@@ -1468,25 +1476,25 @@ impl Widget for MarioWidget {
                         _ => BG,
                     };
 
-                    let draw_px = start_x + (col as u16) * 2;
+                    let draw_px = start_x + col as u16;
                     let draw_py = start_y + cell_y as u16;
 
-                    if draw_px + 1 < area.right() && draw_py < area.bottom() {
+                    if draw_px < area.right() && draw_py < area.bottom() {
                         let (symbol, style) = match (p_top, p_bottom) {
                             ('.', '.') => {
                                 ("", Style::default())
                             }
                             (_, '.') => {
-                                ("▀▀", Style::default().fg(c_top).bg(BG))
+                                ("▀", Style::default().fg(c_top).bg(BG))
                             }
                             ('.', _) => {
-                                ("▄▄", Style::default().fg(c_bottom).bg(BG))
+                                ("▄", Style::default().fg(c_bottom).bg(BG))
                             }
                             (_, _) => {
                                 if p_top == p_bottom {
-                                    ("██", Style::default().fg(c_top))
+                                    ("█", Style::default().fg(c_top))
                                 } else {
-                                    ("▀▀", Style::default().fg(c_top).bg(c_bottom))
+                                    ("▀", Style::default().fg(c_top).bg(c_bottom))
                                 }
                             }
                         };
