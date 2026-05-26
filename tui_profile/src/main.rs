@@ -20,8 +20,9 @@ mod platform {
         layout::{Alignment, Constraint, Direction, Layout, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType},
+        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType, Widget},
         symbols::Marker,
+        buffer::Buffer,
         Frame, Terminal,
     };
     pub type Instant = std::time::Instant;
@@ -34,8 +35,9 @@ mod platform {
         layout::{Alignment, Constraint, Direction, Layout, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType},
+        widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Wrap, BarChart, Sparkline, Chart, Axis, Dataset, GraphType, Widget},
         symbols::Marker,
+        buffer::Buffer,
         Frame, Terminal,
     };
     pub type Instant = web_time::Instant;
@@ -702,7 +704,7 @@ fn ui(f: &mut Frame, app: &App) {
             Constraint::Length(3), // header
             Constraint::Length(3), // tabs
             Constraint::Min(0),    // body
-            Constraint::Length(1), // footer
+            Constraint::Length(2), // footer
         ])
         .split(size);
 
@@ -1346,6 +1348,14 @@ fn render_contact(f: &mut Frame, area: Rect, accent: Color) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Top line (for Mario to jump on)
+            Constraint::Length(1), // Bottom line (for help text)
+        ])
+        .split(area);
+
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" ← → ", Style::default().fg(accent)),
         Span::styled("navigate", Style::default().fg(DIM)),
@@ -1365,5 +1375,66 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled(format!("FPS: {:.1}", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
     ]))
     .alignment(Alignment::Center);
-    f.render_widget(footer, area);
+    f.render_widget(footer, chunks[1]);
+
+    // Render Mario running and jumping across the footer!
+    let mario = MarioWidget { tick_count: app.tick_count };
+    f.render_widget(mario, area);
+}
+
+// ─── Custom Mario TUI Widget ─────────────────────────────────────────────────
+pub struct MarioWidget {
+    pub tick_count: u64,
+}
+
+impl Widget for MarioWidget {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        if area.height < 2 {
+            return;
+        }
+
+        let width = area.width as usize;
+        let period = 400; // Ticks between runs
+        let speed = 1;    // Ticks per column move
+        let run_ticks = width * speed;
+        let cycle_tick = (self.tick_count % period) as usize;
+
+        if cycle_tick < run_ticks {
+            let x = cycle_tick / speed;
+            
+            // Mario jumps every 35 columns
+            let x_mod = x % 35;
+            let is_jumping = x_mod >= 12 && x_mod <= 20;
+
+            let draw_y = if is_jumping {
+                area.top()
+            } else {
+                area.top() + 1
+            };
+
+            let frame = (self.tick_count / 3) % 3; // leg animation frame
+
+            let leg_char = if is_jumping {
+                "^"
+            } else {
+                match frame {
+                    0 => "\\",
+                    1 => "|",
+                    _ => "/",
+                }
+            };
+
+            let cap_style = Style::default().fg(Color::Red).add_modifier(Modifier::BOLD);
+            let body_style = Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD);
+            let legs_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+
+            let draw_x = area.left() + x as u16;
+
+            if draw_x + 2 < area.right() {
+                buf.set_string(draw_x, draw_y, "o", cap_style);
+                buf.set_string(draw_x + 1, draw_y, "M", body_style);
+                buf.set_string(draw_x + 2, draw_y, leg_char, legs_style);
+            }
+        }
+    }
 }
