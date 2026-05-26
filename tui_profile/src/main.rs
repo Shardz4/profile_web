@@ -537,8 +537,8 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
         .constraints([
             Constraint::Length(3),  // Header / Title
             Constraint::Min(0),     // Middle Widgets (BarChart & Chart)
-            Constraint::Length(7),  // Sparkline
-            Constraint::Length(3),  // Boot Button / Prompt
+            Constraint::Length(6),  // Sparkline
+            Constraint::Length(10), // Mario + Boot Button
         ])
         .split(size);
 
@@ -665,8 +665,8 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     let boot_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // Space for Mario running/jumping
-            Constraint::Length(1), // Bottom line for prompt text
+            Constraint::Length(8), // Space for Mario running/jumping
+            Constraint::Length(2), // Bottom lines for prompt text
         ])
         .split(main_chunks[3]);
 
@@ -1389,67 +1389,110 @@ pub struct MarioWidget {
 
 impl Widget for MarioWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.height < 3 {
+        if area.height < 9 {
             return;
         }
 
         let width = area.width as usize;
-        let period = 600; // Ticks between runs (5 seconds at 120Hz)
-        let speed = 3;    // Ticks per column move (slower, ~40 columns/sec)
+        let period = 600; // Ticks between runs
+        let speed = 3;    // Ticks per column move
         let run_ticks = width * speed;
         let cycle_tick = (self.tick_count % period) as usize;
 
         if cycle_tick < run_ticks {
             let x = cycle_tick / speed;
             
-            // Mario jumps every 35 columns
-            let x_mod = x % 35;
-            let is_jumping = x_mod >= 12 && x_mod <= 20;
+            // Mario jumps every 45 columns
+            let x_mod = x % 45;
+            let is_jumping = x_mod >= 15 && x_mod <= 25;
 
-            // Running: Cap on Line 1, Body on Line 2
-            // Jumping: Cap on Line 0, Body on Line 1
-            let draw_y = if is_jumping {
-                area.top()
-            } else {
-                area.top() + 1
-            };
+            // Calculate vertical offset (0 for jumping, 2 for running)
+            let dy = if is_jumping { 0 } else { 2 };
 
-            let frame = (self.tick_count / 8) % 3; // leg animation speed matches slower movement
+            let start_x = area.left() + x as u16;
+            let start_y = area.top() + dy;
 
-            let body_style = Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD);
-            let limbs_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+            let frame = (self.tick_count / 8) % 2; // running frame index
 
-            let draw_x = area.left() + x as u16;
+            // NES Mario 16x12 pixel art color mappings
+            let r_color = Color::Rgb(228, 0, 15);   // Red
+            let g_color = Color::Rgb(90, 104, 0);    // Green/Olive shirt/shoes/hair
+            let p_color = Color::Rgb(255, 166, 0);   // Peach/Skin
+            let y_color = Color::Rgb(255, 199, 44);  // Yellow overalls buttons
 
-            if draw_x + 2 < area.right() {
-                // Draw top line (hat)
-                buf.set_string(
-                    draw_x + 1,
-                    draw_y,
-                    "▲",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                );
+            let mut grid = [
+                ['.', '.', '.', 'R', 'R', 'R', 'R', 'R', 'R', '.', '.', '.'],
+                ['.', '.', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', '.'],
+                ['.', '.', 'G', 'G', 'G', 'P', 'P', 'G', 'P', '.', '.', '.'],
+                ['.', 'G', 'P', 'G', 'P', 'P', 'P', 'G', 'P', 'P', 'P', '.'],
+                ['.', 'G', 'P', 'G', 'G', 'P', 'P', 'P', 'G', 'P', 'P', 'P'],
+                ['.', 'G', 'G', 'P', 'P', 'P', 'P', 'G', 'G', 'G', 'G', '.'],
+                ['.', '.', '.', 'P', 'P', 'P', 'P', 'P', 'P', 'P', '.', '.'],
+                ['.', '.', 'G', 'G', 'R', 'G', 'G', 'G', 'G', '.', '.', '.'],
+                ['.', 'G', 'G', 'G', 'R', 'G', 'G', 'R', 'G', 'G', 'G', '.'],
+                ['G', 'G', 'G', 'G', 'R', 'R', 'R', 'R', 'G', 'G', 'G', 'G'],
+                ['P', 'P', 'G', 'R', 'Y', 'R', 'R', 'Y', 'R', 'G', 'P', 'P'],
+                ['P', 'P', 'P', 'R', 'R', 'R', 'R', 'R', 'R', 'P', 'P', 'P'],
+                ['.', '.', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', '.', '.'],
+                // legs change on frame 1:
+                ['.', '.', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', '.', '.'],
+                ['.', 'G', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', 'G', '.'],
+                ['G', 'G', 'G', 'G', '.', '.', '.', '.', 'G', 'G', 'G', 'G'],
+            ];
 
-                // Draw bottom line (body & limbs)
-                if is_jumping {
-                    buf.set_string(draw_x, draw_y + 1, "\\", limbs_style);
-                    buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
-                    buf.set_string(draw_x + 2, draw_y + 1, "^", limbs_style);
-                } else {
-                    match frame {
-                        0 => {
-                            buf.set_string(draw_x, draw_y + 1, "\\", limbs_style);
-                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
-                            buf.set_string(draw_x + 2, draw_y + 1, "/", limbs_style);
-                        }
-                        1 => {
-                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
-                            buf.set_string(draw_x + 2, draw_y + 1, "|", limbs_style);
-                        }
-                        _ => {
-                            buf.set_string(draw_x, draw_y + 1, "/", limbs_style);
-                            buf.set_string(draw_x + 1, draw_y + 1, "M", body_style);
-                            buf.set_string(draw_x + 2, draw_y + 1, "\\", limbs_style);
+            if frame == 1 && !is_jumping {
+                grid[13] = ['.', '.', '.', 'G', 'G', '.', '.', 'G', 'G', '.', '.', '.'];
+                grid[14] = ['.', '.', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', '.', '.'];
+                grid[15] = ['.', 'G', 'G', 'G', 'G', '.', '.', 'G', 'G', 'G', 'G', '.'];
+            }
+
+            // Render the grid double-pixel style
+            for cell_y in 0..8 {
+                for col in 0..12 {
+                    let p_top = grid[cell_y * 2][col];
+                    let p_bottom = grid[cell_y * 2 + 1][col];
+
+                    let c_top = match p_top {
+                        'R' => r_color,
+                        'G' => g_color,
+                        'P' => p_color,
+                        'Y' => y_color,
+                        _ => BG,
+                    };
+
+                    let c_bottom = match p_bottom {
+                        'R' => r_color,
+                        'G' => g_color,
+                        'P' => p_color,
+                        'Y' => y_color,
+                        _ => BG,
+                    };
+
+                    let draw_px = start_x + (col as u16) * 2;
+                    let draw_py = start_y + cell_y as u16;
+
+                    if draw_px + 1 < area.right() && draw_py < area.bottom() {
+                        let (symbol, style) = match (p_top, p_bottom) {
+                            ('.', '.') => {
+                                ("", Style::default())
+                            }
+                            (_, '.') => {
+                                ("▀▀", Style::default().fg(c_top).bg(BG))
+                            }
+                            ('.', _) => {
+                                ("▄▄", Style::default().fg(c_bottom).bg(BG))
+                            }
+                            (_, _) => {
+                                if p_top == p_bottom {
+                                    ("██", Style::default().fg(c_top))
+                                } else {
+                                    ("▀▀", Style::default().fg(c_top).bg(c_bottom))
+                                }
+                            }
+                        };
+
+                        if !symbol.is_empty() {
+                            buf.set_string(draw_px, draw_py, symbol, style);
                         }
                     }
                 }
