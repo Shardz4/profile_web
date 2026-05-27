@@ -132,6 +132,9 @@ struct App {
     pub shell_wait_ticks: u32,
     pub boot_mode: bool,
     pub sparkline_data: Vec<u64>,
+    pub konami_buffer: Vec<char>,
+    pub konami_active: bool,
+    pub konami_ticks: u64,
 }
 
 impl App {
@@ -208,6 +211,9 @@ impl App {
             shell_wait_ticks: 0,
             boot_mode: true,
             sparkline_data: vec![0; 100],
+            konami_buffer: Vec::new(),
+            konami_active: false,
+            konami_ticks: 0,
         }
     }
     pub fn next_tab(&mut self) {
@@ -302,6 +308,9 @@ impl App {
                 }
             }
         }
+        if self.konami_active && self.tick_count.saturating_sub(self.konami_ticks) >= 300 {
+            self.konami_active = false;
+        }
     }
     pub fn get_accent_color(&self) -> Color {
         let t = self.tick_count as f64 * 0.02;
@@ -310,6 +319,18 @@ impl App {
         let g = ((t.sin() * 40.0) + 215.0) as u8; // 175 to 255
         let b = (((t + 3.14).sin() * 40.0) + 215.0) as u8; // 175 to 255
         Color::Rgb(r, g, b)
+    }
+    pub fn register_key(&mut self, c: char) {
+        self.konami_buffer.push(c);
+        if self.konami_buffer.len() > 10 {
+            self.konami_buffer.remove(0);
+        }
+        let sequence = ['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 'b', 'a'];
+        if self.konami_buffer.len() == 10 && self.konami_buffer == sequence {
+            self.konami_active = true;
+            self.konami_ticks = self.tick_count;
+            self.konami_buffer.clear();
+        }
     }
 }
 
@@ -348,6 +369,19 @@ where
 
         if event::poll(Duration::from_millis(8))? {
             if let Event::Key(key) = event::read()? {
+                let key_char = match key.code {
+                    KeyCode::Up => Some('u'),
+                    KeyCode::Down => Some('d'),
+                    KeyCode::Left => Some('l'),
+                    KeyCode::Right => Some('r'),
+                    KeyCode::Char('b') | KeyCode::Char('B') => Some('b'),
+                    KeyCode::Char('a') | KeyCode::Char('A') => Some('a'),
+                    _ => Some('_'),
+                };
+                if let Some(c) = key_char {
+                    app.register_key(c);
+                }
+
                 if app.boot_mode {
                     match key.code {
                         KeyCode::Enter | KeyCode::Char(' ') => {
@@ -464,6 +498,19 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
         let app = app.clone();
         move |key_event| {
             let mut app = app.borrow_mut();
+            let key_char = match key_event.code {
+                KeyCode::Up => Some('u'),
+                KeyCode::Down => Some('d'),
+                KeyCode::Left => Some('l'),
+                KeyCode::Right => Some('r'),
+                KeyCode::Char('b') | KeyCode::Char('B') => Some('b'),
+                KeyCode::Char('a') | KeyCode::Char('A') => Some('a'),
+                _ => Some('_'),
+            };
+            if let Some(c) = key_char {
+                app.register_key(c);
+            }
+
             if app.boot_mode {
                 match key_event.code {
                     KeyCode::Enter | KeyCode::Char(' ') => {
@@ -713,6 +760,99 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     f.render_widget(mario, boot_chunks[0]);
 }
 
+fn centered_rect_fixed(width: u16, height: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(height),
+            Constraint::Min(0),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(width),
+            Constraint::Min(0),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+fn render_konami_overlay(f: &mut Frame, app: &App) {
+    let area = f.area();
+    
+    // We want a centered box of size 70 wide, 14 tall
+    let popup_area = centered_rect_fixed(70, 14, area);
+
+    // Color cycling for flashy NES look
+    let pulse = (app.tick_count / 15) % 3;
+    let (border_color, text_color) = match pulse {
+        0 => (Color::Rgb(255, 0, 255), Color::Rgb(255, 215, 0)), // Magenta border, Gold text
+        1 => (Color::Rgb(255, 215, 0), Color::Rgb(0, 255, 255)), // Gold border, Cyan text
+        _ => (Color::Rgb(0, 255, 255), Color::Rgb(255, 0, 255)), // Cyan border, Magenta text
+    };
+
+    // Draw the overlay block
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(BG))
+        .title(Span::styled(" ♥ CHEAT CODE ACTIVATED ♥ ", Style::default().fg(border_color).add_modifier(Modifier::BOLD)));
+    
+    f.render_widget(block.clone(), popup_area);
+
+    // Get the inner area of the block
+    let inner_area = block.inner(popup_area);
+    
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // spacing
+            Constraint::Length(6), // ASCII art
+            Constraint::Length(1), // spacing
+            Constraint::Length(1), // Sub-text
+            Constraint::Length(1), // Blinking prompt
+            Constraint::Min(0),
+        ])
+        .split(inner_area);
+
+    // ASCII art text lines
+    let ascii_art = r#" ██████╗  ██████╗     ██╗     ██╗██╗   ██╗███████╗███████╗██╗
+██╔═══██╗██╔═══██╗    ██║     ██║██║   ██║██╔════╝██╔════╝██║
+ ▄▄▄▄██║██║   ██║    ██║     ██║██║   ██║█████╗  ███████╗██║
+ ▀▀▀▀██║██║   ██║    ██║     ██║╚██╗ ██╔╝██╔══╝  ╚════██║╚═╝
+██████╔╝╚██████╔╝    ███████╗██║ ╚████╔╝ ███████╗███████║██╗
+╚═════╝  ╚═════╝     ╚══════╝╚═╝  ╚═══╝  ╚══════╝╚══════╝╚═╝"#;
+
+    let ascii_lines: Vec<Line> = ascii_art
+        .lines()
+        .map(|line| Line::from(Span::styled(line, Style::default().fg(text_color).add_modifier(Modifier::BOLD))))
+        .collect();
+
+    let ascii_para = Paragraph::new(ascii_lines).alignment(Alignment::Center);
+    f.render_widget(ascii_para, chunks[1]);
+
+    // Sub-text
+    let sub_text = Paragraph::new(Line::from(vec![
+        Span::styled("CONTRA 1986 // RETRO CHEAT MODE ENABLED", Style::default().fg(Color::Gray)),
+    ])).alignment(Alignment::Center);
+    f.render_widget(sub_text, chunks[3]);
+
+    // Blinking prompt
+    let show_prompt = (app.tick_count / 30) % 2 == 0;
+    let prompt_span = if show_prompt {
+        Span::styled("★★★★★ 30 LIVES GRANTED ★★★★★", Style::default().fg(border_color).add_modifier(Modifier::BOLD))
+    } else {
+        Span::styled("", Style::default())
+    };
+    
+    let prompt_para = Paragraph::new(Line::from(vec![prompt_span])).alignment(Alignment::Center);
+    f.render_widget(prompt_para, chunks[4]);
+}
+
 // ─── Root UI ────────────────────────────────────────────────────────────────
 fn ui(f: &mut Frame, app: &App) {
     let size = f.area();
@@ -720,33 +860,36 @@ fn ui(f: &mut Frame, app: &App) {
 
     if app.boot_mode {
         render_boot_screen(f, app, accent);
-        return;
+    } else {
+        // Outer chrome
+        let outer = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Double)
+            .border_style(Style::default().fg(accent))
+            .style(Style::default().bg(BG));
+        f.render_widget(outer, size);
+
+        // Inner layout: header | tabs | body | footer
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(3), // header
+                Constraint::Length(3), // tabs
+                Constraint::Min(0),    // body
+                Constraint::Length(1), // footer
+            ])
+            .split(size);
+
+        render_header(f, chunks[0], accent, app.tick_count);
+        render_tabs(f, chunks[1], app, accent);
+        render_body(f, chunks[2], app, accent);
+        render_footer(f, chunks[3], app, accent);
     }
 
-    // Outer chrome
-    let outer = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(accent))
-        .style(Style::default().bg(BG));
-    f.render_widget(outer, size);
-
-    // Inner layout: header | tabs | body | footer
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([
-            Constraint::Length(3), // header
-            Constraint::Length(3), // tabs
-            Constraint::Min(0),    // body
-            Constraint::Length(1), // footer
-        ])
-        .split(size);
-
-    render_header(f, chunks[0], accent, app.tick_count);
-    render_tabs(f, chunks[1], app, accent);
-    render_body(f, chunks[2], app, accent);
-    render_footer(f, chunks[3], app, accent);
+    if app.konami_active {
+        render_konami_overlay(f, app);
+    }
 }
 
 // ─── Header ─────────────────────────────────────────────────────────────────
