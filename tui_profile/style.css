@@ -49,13 +49,24 @@ html, body {
 
 /* ─── CRT Power-On Flicker ──────────────────────────────────────────────── */
 @keyframes crt-flicker-on {
-    0%   { opacity: 0;   filter: brightness(3) saturate(0); }
-    5%   { opacity: 1;   filter: brightness(2.5) saturate(0.3); }
-    10%  { opacity: 0.4; filter: brightness(1.5) saturate(0.5); }
-    15%  { opacity: 1;   filter: brightness(2) saturate(0.6); }
-    25%  { opacity: 0.7; filter: brightness(1.3) saturate(0.8); }
-    50%  { opacity: 0.95; filter: brightness(1.1) saturate(1); }
-    100% { opacity: 1;   filter: brightness(1.04) contrast(1.06) saturate(1.05); }
+    0%   { opacity: 0;    filter: brightness(0) saturate(0); }
+    2%   { opacity: 0;    filter: brightness(0) saturate(0); }
+    3%   { opacity: 1;    filter: brightness(4) saturate(0); }
+    5%   { opacity: 0;    filter: brightness(0) saturate(0); }
+    8%   { opacity: 0.7;  filter: brightness(3) saturate(0); }
+    10%  { opacity: 0;    filter: brightness(0) saturate(0); }
+    14%  { opacity: 0;    filter: brightness(0) saturate(0); }
+    16%  { opacity: 1;    filter: brightness(2.5) saturate(0.1); }
+    18%  { opacity: 0.3;  filter: brightness(1.5) saturate(0.1); }
+    22%  { opacity: 1;    filter: brightness(2) saturate(0.2); }
+    26%  { opacity: 0.5;  filter: brightness(1.2) saturate(0.3); }
+    30%  { opacity: 0.9;  filter: brightness(1.8) saturate(0.3); }
+    35%  { opacity: 0.6;  filter: brightness(1.3) saturate(0.4); }
+    40%  { opacity: 1;    filter: brightness(1.5) saturate(0.5); }
+    50%  { opacity: 0.85; filter: brightness(1.2) saturate(0.7); }
+    60%  { opacity: 1;    filter: brightness(1.15) saturate(0.8); }
+    75%  { opacity: 0.95; filter: brightness(1.08) saturate(0.95); }
+    100% { opacity: 1;    filter: brightness(1.04) contrast(1.06) saturate(1.05); }
 }
 
 #terminal-container canvas {
@@ -68,6 +79,6 @@ html, body {
     /* Phosphor glow + steady-state CRT tone */
     filter: brightness(1.04) contrast(1.06) saturate(1.05);
 
-    /* Power-on flicker plays once on load */
-    animation: crt-flicker-on 0.8s ease-out forwards;
+    /* Power-on flicker plays once on load — 2.5s dramatic warmup */
+    animation: crt-flicker-on 2.5s ease-out forwards;
 }
