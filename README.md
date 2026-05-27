@@ -7,10 +7,12 @@ A high-performance developer profile and systems monitor emulator built using **
 ## 🚀 Key Features
 
 *   **Retro CRT Terminal UI**: Styled with responsive terminal grids, double borders, scanline overlays, and neon glow effects.
-*   **60+ FPS Animations**: Smooth, live-animated CPU core progress bars and a rolling system load graph.
-*   **Dynamic RGB Accent Cycling**: Borders cycle smoothly through neon cyans, teals, and blues to create a premium, futuristic layout.
-*   **WASM & Native Cross-Compilation**: Dual-backend support allows it to run natively in a standard desktop terminal (via `crossterm`) or in the browser (via `ratzilla`'s `DomBackend`).
-*   **Keyboard Navigation**: Jump tabs using `←` / `→` / `Tab` or number keys `1`-`4`.
+*   **Animated Boot Splash Screen**: A vintage interactive landing page showing telemetric animations (120Hz core voltage bars, dual-sinusoidal phase charts, real-time frequency analytics spectrums) before loading the main developer profile.
+*   **Double-Pixel Mario Widget**: A custom 12x16 NES Small Mario sprite that runs and jumps across the footer of the splash screen, complete with animated leg cycles and parabolic gravity physics.
+*   **60/120 FPS Animations**: Fixed-timestep update loop syncing terminal rendering to high refresh rate displays.
+*   **Dynamic RGB Accent Cycling**: Main borders cycle smoothly through neon cyans, teals, and blues to create a premium, futuristic layout.
+*   **WASM & Native Cross-Compilation**: Dual-backend support allows it to run natively in a standard desktop terminal (via `crossterm`) or in the browser (via `ratzilla`'s canvas-driven DOM backend).
+*   **Keyboard & Mouse Navigation**: Navigate tabs using `←` / `→` / `Tab`, number keys `1`-`4`, or mouse clicks.
 
 ---
 
@@ -24,18 +26,15 @@ A high-performance developer profile and systems monitor emulator built using **
 
 ---
 
-## 📈 Activity & Impact
+## 👾 Custom TUI Double-Pixel Rendering
 
-<p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=Shardz4&show_icons=true&theme=tokyonight&count_private=true" alt="Arnav's Stats" width="48%" />
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Shardz4&layout=compact&theme=tokyonight" alt="Top Languages" width="48%" />
-</p>
-
-<p align="center">
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=Shardz4&theme=tokyonight" alt="GitHub Streak" width="97%" />
-</p>
+A typical terminal character cell has a roughly 1:2 width-to-height aspect ratio. To render block art without stretching, this application utilizes a custom double-pixel rasterizer:
+*   **Vertical Half-Blocks**: By utilizing the unicode half-block characters (`▀` and `▄`), we fit two vertical pixels inside a single character cell.
+*   **1:1 Square Pixels**: Drawing 1 vertical pixel (0.5 character cells high) over 1 character cell wide yields a perfect 1:1 square pixel aspect ratio.
+*   **Sprite Mapping**: The `MarioWidget` maps a 12x16 grid of state values (`R` = Red, `G` = Green, `P` = Peach, `Y` = Yellow, `.` = Transparency) into 8 vertical character cells and 12 horizontal character cells, creating a clean NES Small Mario sprite directly in terminal text.
 
 ---
+
 
 ## 🛠️ Setup & Running Locally
 
