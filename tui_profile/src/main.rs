@@ -52,6 +52,29 @@ const DIM: Color = Color::DarkGray;
 const FG: Color = Color::White;
 const BG: Color = Color::Black;
 
+// ─── Glitch Text Effect ─────────────────────────────────────────────────────
+fn glitch_str(base: &str, tick: u64) -> String {
+    let glitch_chars = ['░','▒','▓','█','▄','▀','╗','╔','═','║','▌','▐','╬','┃','┏','┛'];
+    let phase = tick % 180;
+    if phase < 8 {
+        let mut s: Vec<char> = base.chars().collect();
+        let len = s.len();
+        if len > 4 {
+            let pos1 = ((tick.wrapping_mul(7).wrapping_add(3)) as usize) % (len - 2) + 1;
+            let pos2 = ((tick.wrapping_mul(13).wrapping_add(5)) as usize) % (len - 2) + 1;
+            let gc1 = (tick as usize) % glitch_chars.len();
+            let gc2 = ((tick + 3) as usize) % glitch_chars.len();
+            s[pos1] = glitch_chars[gc1];
+            if pos2 != pos1 {
+                s[pos2] = glitch_chars[gc2];
+            }
+        }
+        s.iter().collect()
+    } else {
+        base.to_string()
+    }
+}
+
 // ─── FPS Tracker ────────────────────────────────────────────────────────────
 struct FpsTracker {
     last_frame: Instant,
@@ -545,7 +568,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     // 1. Render Header
     let header_lines = vec![
         Line::from(vec![
-            Span::styled(" ▸ ARNAV SHARMA PORTFOLIO ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+            Span::styled(glitch_str(" ▸ ARNAV SHARMA PORTFOLIO ", app.tick_count), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
             Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
         ]),
         Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))),
@@ -720,19 +743,19 @@ fn ui(f: &mut Frame, app: &App) {
         ])
         .split(size);
 
-    render_header(f, chunks[0], accent);
+    render_header(f, chunks[0], accent, app.tick_count);
     render_tabs(f, chunks[1], app, accent);
     render_body(f, chunks[2], app, accent);
     render_footer(f, chunks[3], app, accent);
 }
 
 // ─── Header ─────────────────────────────────────────────────────────────────
-fn render_header(f: &mut Frame, area: Rect, accent: Color) {
+fn render_header(f: &mut Frame, area: Rect, accent: Color, tick: u64) {
     let header = Paragraph::new(vec![
         Line::from(vec![
             Span::styled("▸ ", Style::default().fg(accent)),
             Span::styled(
-                "ARNAV SHARMA",
+                glitch_str("ARNAV SHARMA", tick),
                 Style::default()
                     .fg(FG)
                     .add_modifier(Modifier::BOLD),
