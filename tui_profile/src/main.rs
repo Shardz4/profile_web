@@ -605,21 +605,32 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([
-            Constraint::Length(3),  // Header / Title
+            Constraint::Length(8),  // Header / Title (increased from 3 to 8 for ASCII logo)
             Constraint::Min(0),     // Middle Widgets (BarChart & Chart)
             Constraint::Length(6),  // Sparkline
             Constraint::Length(14), // Mario + Boot Button
         ])
         .split(size);
 
-    // 1. Render Header
-    let header_lines = vec![
-        Line::from(vec![
-            Span::styled(glitch_str(" ▸ ARNAV SHARMA PORTFOLIO ", app.tick_count), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-            Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
-        ]),
-        Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))),
-    ];
+    // 1. Render Header (with ASCII Logo)
+    let logo_text = r#" █████╗ ███████╗
+██╔══██╗██╔════╝
+███████║███████╗
+██╔══██║╚════██║
+██║  ██║███████║
+╚═╝  ╚═╝╚══════╝"#;
+
+    let mut header_lines: Vec<Line> = logo_text
+        .lines()
+        .map(|line| Line::from(Span::styled(line, Style::default().fg(accent).add_modifier(Modifier::BOLD))))
+        .collect();
+
+    header_lines.push(Line::from(vec![
+        Span::styled(glitch_str(" ▸ ARNAV SHARMA PORTFOLIO ", app.tick_count), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
+    ]));
+    header_lines.push(Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))));
+
     let header = Paragraph::new(header_lines).alignment(Alignment::Center);
     f.render_widget(header, main_chunks[0]);
 
