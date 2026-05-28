@@ -605,34 +605,53 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([
-            Constraint::Length(8),  // Header / Title (increased from 3 to 8 for ASCII logo)
+            Constraint::Length(5),  // Header / Title (reduced from 8 to 5 for compact side-by-side logo layout)
             Constraint::Min(0),     // Middle Widgets (BarChart & Chart)
             Constraint::Length(6),  // Sparkline
             Constraint::Length(14), // Mario + Boot Button
         ])
         .split(size);
 
-    // 1. Render Header (with ASCII Logo)
-    let logo_text = r#" █████╗ ███████╗
-██╔══██╗██╔════╝
-███████║███████╗
-██╔══██║╚════██║
-██║  ██║███████║
-╚═╝  ╚═╝╚══════╝"#;
+    // 1. Render Header (Logo + Title side-by-side)
+    let header_rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Logo + Title row
+            Constraint::Length(1), // Separator row
+            Constraint::Min(0),
+        ])
+        .split(main_chunks[0]);
 
-    let mut header_lines: Vec<Line> = logo_text
-        .lines()
-        .map(|line| Line::from(Span::styled(line, Style::default().fg(accent).add_modifier(Modifier::BOLD))))
-        .collect();
+    let header_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length(14), // Width of the smaller logo
+            Constraint::Min(0),     // Rest of the space for Title + FPS
+        ])
+        .split(header_rows[0]);
 
-    header_lines.push(Line::from(vec![
-        Span::styled(glitch_str(" ▸ ARNAV SHARMA PORTFOLIO ", app.tick_count), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
-    ]));
-    header_lines.push(Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))));
+    // Logo on the left
+    let logo_text = r#" ▄▀▀▄ ▄▀▀▀ 
+ █▄▄█ ▀▀▀▄ 
+ █  █ ▄▄▄▀ "#;
+    let logo_para = Paragraph::new(logo_text)
+        .style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+    f.render_widget(logo_para, header_cols[0]);
 
-    let header = Paragraph::new(header_lines).alignment(Alignment::Center);
-    f.render_widget(header, main_chunks[0]);
+    // Title + FPS on the right, vertically centered (shifted down 1 line)
+    let title_lines = vec![
+        Line::from(""), // Empty line for vertical alignment
+        Line::from(vec![
+            Span::styled(glitch_str(" ▸ ARNAV SHARMA PORTFOLIO ", app.tick_count), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" [FPS: {:.1}]", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
+        ]),
+    ];
+    let title_para = Paragraph::new(title_lines);
+    f.render_widget(title_para, header_cols[1]);
+
+    // Horizontal separator
+    let separator = Paragraph::new(Line::from(Span::styled(" ──────────────────────────────────────────────────────────────────────────", Style::default().fg(DIM))));
+    f.render_widget(separator, header_rows[1]);
 
     // 2. Middle Row: BarChart & Dual Sine Chart
     let mid_chunks = Layout::default()
