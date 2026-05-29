@@ -52,6 +52,11 @@ const DIM: Color = Color::DarkGray;
 const FG: Color = Color::White;
 const BG: Color = Color::Black;
 
+// ─── Responsive Breakpoints ─────────────────────────────────────────────────
+const NARROW: u16 = 80;
+#[allow(dead_code)]
+const MEDIUM: u16 = 120;
+
 // ─── Glitch Text Effect ─────────────────────────────────────────────────────
 fn glitch_str(base: &str, tick: u64) -> String {
     let glitch_chars = ['░','▒','▓','█','▄','▀','╗','╔','═','║','▌','▐','╬','┃','┏','┛'];
@@ -696,13 +701,78 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
     f.render_widget(separator, header_rows[1]);
 
     // 2. Middle Row: BarChart & Dual Sine Chart
-    let mid_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(50), // BarChart
-            Constraint::Percentage(50), // Chart (Sinusoidal axis)
-        ])
-        .split(main_chunks[1]);
+    if size.width < NARROW {
+        // Narrow: stack vertically
+        let mid_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(main_chunks[1]);
+
+        // BarChart on top
+        let bar_values: Vec<u64> = (0..6).map(|i| {
+            let t = app.tick_count as f64 * 0.12;
+            let base = 50.0 + 40.0 * (t + i as f64 * 0.6).sin();
+            let noise = ((app.tick_count + i as u64) % 7) as f64;
+            (base + noise).clamp(5.0, 95.0) as u64
+        }).collect();
+
+        let bar_data = [
+            ("C1", bar_values[0]),
+            ("C2", bar_values[1]),
+            ("C3", bar_values[2]),
+            ("C4", bar_values[3]),
+            ("C5", bar_values[4]),
+            ("C6", bar_values[5]),
+        ];
+
+        let barchart = BarChart::default()
+            .block(Block::default()
+                .title(Span::styled(" core voltages ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)))
+            .data(&bar_data)
+            .bar_width(2)
+            .bar_gap(1)
+            .value_style(Style::default().fg(Color::Black).bg(accent))
+            .bar_style(Style::default().fg(accent));
+        f.render_widget(barchart, mid_chunks[0]);
+
+        // Sine chart on bottom
+        let t = app.tick_count as f64 * 0.08;
+        let mut wave1 = Vec::new();
+        for i in 0..60 {
+            let x = (i as f64) * 0.25;
+            let y1 = (x - t).sin();
+            wave1.push((x, y1));
+        }
+        let dataset1 = Dataset::default()
+            .name("SIG_A")
+            .marker(Marker::Braille)
+            .graph_type(GraphType::Line)
+            .style(Style::default().fg(Color::Cyan))
+            .data(&wave1);
+        let chart = Chart::new(vec![dataset1])
+            .block(Block::default()
+                .title(Span::styled(" signal ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)))
+            .x_axis(Axis::default().style(Style::default().fg(DIM)).bounds([0.0, 15.0]))
+            .y_axis(Axis::default().style(Style::default().fg(DIM)).bounds([-1.2, 1.2]));
+        f.render_widget(chart, mid_chunks[1]);
+    } else {
+        // Normal side-by-side layout
+        let mid_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(main_chunks[1]);
 
     // 2a. BarChart Data (animated via tick_count)
     let bar_values: Vec<u64> = (0..12).map(|i| {
@@ -791,6 +861,7 @@ fn render_boot_screen(f: &mut Frame, app: &App, accent: Color) {
                 Span::styled("1.0", Style::default().fg(DIM)),
             ]));
     f.render_widget(chart, mid_chunks[1]);
+    } // end of normal (non-narrow) boot chart layout
 
     // 3. Sparkline Widget
     let sparkline = Sparkline::default()
@@ -1036,76 +1107,115 @@ fn make_progress_bar(val: f64, width: usize) -> String {
 // ─── Tab: Home ───────────────────────────────────────────────────────────────
 // ─── Tab: Home ───────────────────────────────────────────────────────────────
 fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-        .split(area);
+    let width = area.width;
 
-    let left_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(14), Constraint::Min(0)])
-        .split(cols[0]);
+    if width < NARROW {
+        // ── NARROW: Stack all panels vertically ──
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(10), // bio (compact)
+                Constraint::Min(0),     // shell simulator
+            ])
+            .split(area);
 
-    let right_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(15), Constraint::Min(0)])
-        .split(cols[1]);
-
-    // Left: bio (top) & Shell Simulator (bottom)
-    let bio_lines = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  Hello, world. ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-            Span::styled("I'm Arnav Sharma.", Style::default().fg(FG)),
-        ]),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  A Computer Science & Engineering student focused on building",
-            Style::default().fg(FG),
-        )),
-        Line::from(Span::styled(
-            "  high-performance, safety-critical systems.",
-            Style::default().fg(FG),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  I build things that run fast, learn well, and break gracefully.",
-            Style::default().fg(DIM),
-        )),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  Currently: ", Style::default().fg(accent)),
-            Span::styled("NIT Hamirpur (CSE Student)", Style::default().fg(FG)),
-        ]),
-        Line::from(vec![
-            Span::styled("  Based in:  ", Style::default().fg(accent)),
-            Span::styled("Solan, Himachal Pradesh, India", Style::default().fg(FG)),
-        ]),
-        Line::from(vec![
-            Span::styled("  Focus:     ", Style::default().fg(accent)),
-            Span::styled(
-                "Systems Programming · Computer Vision · Kernel Research",
-                Style::default().fg(FG),
-            ),
-        ]),
-    ];
-
-    let bio = Paragraph::new(bio_lines)
-        .block(
-            Block::default()
+        // Compact bio
+        let bio_lines = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Hello, world. ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+                Span::styled("I'm Arnav Sharma.", Style::default().fg(FG)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("  CSE Student · NIT Hamirpur", Style::default().fg(FG))),
+            Line::from(Span::styled("  Systems · CV · Kernel Research", Style::default().fg(FG))),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Based in: ", Style::default().fg(accent)),
+                Span::styled("Solan, HP, India", Style::default().fg(FG)),
+            ]),
+        ];
+        let bio = Paragraph::new(bio_lines)
+            .block(Block::default()
                 .title(Span::styled(" about ", Style::default().fg(DIM)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(DIM)),
-        )
-        .wrap(Wrap { trim: false });
-    f.render_widget(bio, left_chunks[0]);
+                .border_style(Style::default().fg(DIM)))
+            .wrap(Wrap { trim: false });
+        f.render_widget(bio, chunks[0]);
+        render_shell_simulator(f, chunks[1], app, accent);
+    } else {
+        // ── NORMAL / WIDE: 2-column layout ──
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
 
-    render_shell_simulator(f, left_chunks[1], app, accent);
+        let left_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(14), Constraint::Min(0)])
+            .split(cols[0]);
 
-    // Right: dynamic stats / simulated CPU monitor (top) & Page Table Allocation Map (bottom)
-    let box_width = cols[1].width as usize;
-    let is_wide = box_width >= 40;
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(15), Constraint::Min(0)])
+            .split(cols[1]);
+
+        // Left: bio (top) & Shell Simulator (bottom)
+        let bio_lines = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Hello, world. ", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+                Span::styled("I'm Arnav Sharma.", Style::default().fg(FG)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  A Computer Science & Engineering student focused on building",
+                Style::default().fg(FG),
+            )),
+            Line::from(Span::styled(
+                "  high-performance, safety-critical systems.",
+                Style::default().fg(FG),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  I build things that run fast, learn well, and break gracefully.",
+                Style::default().fg(DIM),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Currently: ", Style::default().fg(accent)),
+                Span::styled("NIT Hamirpur (CSE Student)", Style::default().fg(FG)),
+            ]),
+            Line::from(vec![
+                Span::styled("  Based in:  ", Style::default().fg(accent)),
+                Span::styled("Solan, Himachal Pradesh, India", Style::default().fg(FG)),
+            ]),
+            Line::from(vec![
+                Span::styled("  Focus:     ", Style::default().fg(accent)),
+                Span::styled(
+                    "Systems Programming · Computer Vision · Kernel Research",
+                    Style::default().fg(FG),
+                ),
+            ]),
+        ];
+
+        let bio = Paragraph::new(bio_lines)
+            .block(
+                Block::default()
+                    .title(Span::styled(" about ", Style::default().fg(DIM)))
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(DIM)),
+            )
+            .wrap(Wrap { trim: false });
+        f.render_widget(bio, left_chunks[0]);
+
+        render_shell_simulator(f, left_chunks[1], app, accent);
+
+        // Right: dynamic stats / simulated CPU monitor (top) & Matrix Rain (bottom)
+        let box_width = cols[1].width as usize;
+        let is_wide = box_width >= 40;
 
     let bar_width = if is_wide {
         ((box_width - 24) / 2).clamp(3, 10)
@@ -1246,6 +1356,7 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     f.render_widget(stats, right_chunks[0]);
 
     render_matrix_rain(f, right_chunks[1], app);
+    } // end of normal/wide home layout
 }
 
 fn render_shell_simulator(f: &mut Frame, area: Rect, app: &App, accent: Color) {
@@ -1434,14 +1545,7 @@ fn render_projects(f: &mut Frame, area: Rect, accent: Color) {
 
 // ─── Tab: Skills ─────────────────────────────────────────────────────────────
 fn render_skills(f: &mut Frame, area: Rect, accent: Color) {
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(33),
-            Constraint::Percentage(34),
-            Constraint::Percentage(33),
-        ])
-        .split(area);
+    let width = area.width;
 
     let systems_skills = vec![
         ("Rust", 92),
@@ -1473,9 +1577,33 @@ fn render_skills(f: &mut Frame, area: Rect, accent: Color) {
         ("Vim / Neovim", 90),
     ];
 
-    render_skill_col(f, cols[0], " systems ", &systems_skills, accent);
-    render_skill_col(f, cols[1], " ml & ai ", &ml_skills, accent);
-    render_skill_col(f, cols[2], " tools ", &tools_skills, accent);
+    if width < NARROW {
+        // Narrow: stack all 3 skill groups vertically
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(34),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ])
+            .split(area);
+        render_skill_col(f, chunks[0], " systems ", &systems_skills, accent);
+        render_skill_col(f, chunks[1], " ml & ai ", &ml_skills, accent);
+        render_skill_col(f, chunks[2], " tools ", &tools_skills, accent);
+    } else {
+        // Normal: 3-column horizontal
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+                Constraint::Percentage(33),
+            ])
+            .split(area);
+        render_skill_col(f, cols[0], " systems ", &systems_skills, accent);
+        render_skill_col(f, cols[1], " ml & ai ", &ml_skills, accent);
+        render_skill_col(f, cols[2], " tools ", &tools_skills, accent);
+    }
 }
 
 fn render_skill_col(f: &mut Frame, area: Rect, title: &str, skills: &[(&str, u8)], accent: Color) {
@@ -1514,10 +1642,7 @@ fn render_skill_col(f: &mut Frame, area: Rect, title: &str, skills: &[(&str, u8)
 
 // ─── Tab: Contact ────────────────────────────────────────────────────────────
 fn render_contact(f: &mut Frame, area: Rect, accent: Color) {
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-        .split(area);
+    let width = area.width;
 
     let contact_lines = vec![
         Line::from(""),
@@ -1549,18 +1674,6 @@ fn render_contact(f: &mut Frame, area: Rect, accent: Color) {
         )),
     ];
 
-    let contact = Paragraph::new(contact_lines)
-        .block(
-            Block::default()
-                .title(Span::styled(" contact ", Style::default().fg(DIM)))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(DIM)),
-        )
-        .wrap(Wrap { trim: false });
-    f.render_widget(contact, cols[0]);
-
-    // availability block
     let avail_lines = vec![
         Line::from(""),
         Line::from(Span::styled(
@@ -1586,29 +1699,61 @@ fn render_contact(f: &mut Frame, area: Rect, accent: Color) {
             Span::styled("║", Style::default().fg(accent)),
         ]),
         Line::from(Span::styled(
-            "  ╚────────────────────╝",
+            "  ╚──────────────────────╝",
             Style::default().fg(accent),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            "  Location:",
-            Style::default().fg(DIM),
-        )),
-        Line::from(Span::styled(
-            "  Solan, HP, India",
-            Style::default().fg(FG),
-        )),
+        Line::from(Span::styled("  Location:", Style::default().fg(DIM))),
+        Line::from(Span::styled("  Solan, HP, India", Style::default().fg(FG))),
     ];
 
-    let avail = Paragraph::new(avail_lines)
-        .block(
-            Block::default()
+    if width < NARROW {
+        // Narrow: stack vertically
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
+
+        let contact = Paragraph::new(contact_lines)
+            .block(Block::default()
+                .title(Span::styled(" contact ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)))
+            .wrap(Wrap { trim: false });
+        f.render_widget(contact, chunks[0]);
+
+        let avail = Paragraph::new(avail_lines)
+            .block(Block::default()
                 .title(Span::styled(" meta ", Style::default().fg(DIM)))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(DIM)),
-        );
-    f.render_widget(avail, cols[1]);
+                .border_style(Style::default().fg(DIM)));
+        f.render_widget(avail, chunks[1]);
+    } else {
+        // Normal: side-by-side
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
+
+        let contact = Paragraph::new(contact_lines)
+            .block(Block::default()
+                .title(Span::styled(" contact ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)))
+            .wrap(Wrap { trim: false });
+        f.render_widget(contact, cols[0]);
+
+        let avail = Paragraph::new(avail_lines)
+            .block(Block::default()
+                .title(Span::styled(" meta ", Style::default().fg(DIM)))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(DIM)));
+        f.render_widget(avail, cols[1]);
+    }
 }
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
