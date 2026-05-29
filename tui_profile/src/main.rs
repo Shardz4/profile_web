@@ -113,6 +113,28 @@ enum ShellState {
     Finished,
 }
 
+// ─── Matrix Rain Column ─────────────────────────────────────────────────────
+struct MatrixCol {
+    head_y: i32,
+    speed: u8,
+    trail_len: u16,
+    chars: Vec<char>,
+}
+
+impl MatrixCol {
+    fn new(seed: u64, max_height: u16) -> Self {
+        let matrix_chars: Vec<char> = "ｦｧｨｩｪｫｬｭｮｯｰ0123456789ABCDEF<>{}|/\\*+=-~^&"
+            .chars().collect();
+        let speed = ((seed % 4) as u8) + 2; // 2–5 ticks per drop
+        let trail_len = ((seed % 8) as u16) + 4; // 4–11 chars
+        let start_y = -((seed % (max_height as u64 + 6)) as i32); // stagger start
+        let chars: Vec<char> = (0..trail_len + 4)
+            .map(|i| matrix_chars[((seed.wrapping_mul(7).wrapping_add(i as u64 * 13)) % matrix_chars.len() as u64) as usize])
+            .collect();
+        Self { head_y: start_y, speed, trail_len, chars }
+    }
+}
+
 // ─── App State ──────────────────────────────────────────────────────────────
 struct App {
     pub tab_index: usize,
@@ -135,6 +157,7 @@ struct App {
     pub konami_buffer: Vec<char>,
     pub konami_active: bool,
     pub konami_ticks: u64,
+    pub matrix_cols: Vec<MatrixCol>,
 }
 
 impl App {
@@ -214,6 +237,7 @@ impl App {
             konami_buffer: Vec::new(),
             konami_active: false,
             konami_ticks: 0,
+            matrix_cols: (0..60).map(|i| MatrixCol::new(i * 37 + 11, 30)).collect(),
         }
     }
     pub fn next_tab(&mut self) {
@@ -310,6 +334,24 @@ impl App {
         }
         if self.konami_active && self.tick_count.saturating_sub(self.konami_ticks) >= 300 {
             self.konami_active = false;
+        }
+
+        // 6. Update matrix rain columns
+        for (i, col) in self.matrix_cols.iter_mut().enumerate() {
+            if self.tick_count % (col.speed as u64) == 0 {
+                col.head_y += 1;
+                // Reset when fully off screen
+                if col.head_y > 40 + col.trail_len as i32 {
+                    *col = MatrixCol::new(self.tick_count.wrapping_mul(7).wrapping_add(i as u64 * 31), 30);
+                    col.head_y = 0;
+                }
+                // Rotate a char in the trail for flicker
+                let matrix_chars: Vec<char> = "ｦｧｨｩｪｫｬｭｮｯｰ0123456789ABCDEF<>{}|/\\*+=-~^&"
+                    .chars().collect();
+                let rot_idx = (self.tick_count.wrapping_add(i as u64)) as usize % col.chars.len();
+                let new_char_idx = (self.tick_count.wrapping_mul(13).wrapping_add(i as u64 * 7)) as usize % matrix_chars.len();
+                col.chars[rot_idx] = matrix_chars[new_char_idx];
+            }
         }
     }
     pub fn get_accent_color(&self) -> Color {
@@ -1203,7 +1245,7 @@ fn render_home(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         );
     f.render_widget(stats, right_chunks[0]);
 
-    render_page_table(f, right_chunks[1], app, accent);
+    render_matrix_rain(f, right_chunks[1], app);
 }
 
 fn render_shell_simulator(f: &mut Frame, area: Rect, app: &App, accent: Color) {
@@ -1259,57 +1301,72 @@ fn render_shell_simulator(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     f.render_widget(shell, area);
 }
 
-fn render_page_table(f: &mut Frame, area: Rect, app: &App, _accent: Color) {
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  Legend: ", Style::default().fg(DIM)),
-            Span::styled(". ", Style::default().fg(Color::DarkGray)), Span::styled("Free ", Style::default().fg(DIM)),
-            Span::styled("■ ", Style::default().fg(Color::Green)), Span::styled("Alloc ", Style::default().fg(DIM)),
-            Span::styled("▩ ", Style::default().fg(Color::Yellow)), Span::styled("Dirty ", Style::default().fg(DIM)),
-            Span::styled("▨ ", Style::default().fg(Color::LightRed)), Span::styled("Locked ", Style::default().fg(DIM)),
-        ]),
-        Line::from(""),
-    ];
-    
-    // Render the 8x8 memory matrix
-    for row in 0..8 {
-        let mut row_spans = vec![
-            Span::styled("  PAGE_TABLE:  ", Style::default().fg(DIM)),
-        ];
-        for col in 0..8 {
-            let idx = row * 8 + col;
-            let ch = app.page_table.get(idx).copied().unwrap_or('.');
-            let (symbol, color) = match ch {
-                'A' => ("■ ", Color::Green),
-                'D' => ("▩ ", Color::Yellow),
-                'R' => ("▨ ", Color::LightRed),
-                _   => (". ", Color::DarkGray),
+fn render_matrix_rain(f: &mut Frame, area: Rect, app: &App) {
+    let block = Block::default()
+        .title(Span::styled(" data stream ", Style::default().fg(DIM)))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let cols = inner.width as usize;
+    let rows = inner.height as usize;
+    if cols == 0 || rows == 0 { return; }
+
+    // Build a 2D grid of (char, brightness) for each cell
+    // brightness: 0 = empty, 1 = darkest trail, 255 = head
+    let mut grid: Vec<Vec<(char, u8)>> = vec![vec![(' ', 0); cols]; rows];
+
+    let num_cols = cols.min(app.matrix_cols.len());
+    for c in 0..num_cols {
+        let col = &app.matrix_cols[c];
+        let head = col.head_y;
+        let trail = col.trail_len as i32;
+
+        for t in 0..=trail {
+            let y = head - t;
+            if y < 0 || y >= rows as i32 { continue; }
+            let char_idx = (t as usize) % col.chars.len();
+            let ch = col.chars[char_idx];
+
+            // Brightness: head is brightest, fades along the trail
+            let brightness = if t == 0 {
+                255u8
+            } else {
+                let ratio = 1.0 - (t as f64 / trail as f64);
+                (ratio * 180.0).max(30.0) as u8
             };
-            row_spans.push(Span::styled(symbol, Style::default().fg(color)));
+            grid[y as usize][c] = (ch, brightness);
         }
-        lines.push(Line::from(row_spans));
     }
-    
-    lines.push(Line::from(""));
-    
-    let active_pages = app.page_table.iter().filter(|&&c| c != '.').count();
-    let usage_pct = (active_pages as f64 / 64.0) * 100.0;
-    lines.push(Line::from(vec![
-        Span::styled("  Memory Used: ", Style::default().fg(DIM)),
-        Span::styled(format!("{:.1}% ", usage_pct), Style::default().fg(Color::LightBlue)),
-        Span::styled(format!("({}/64 pages allocated)", active_pages), Style::default().fg(DIM)),
-    ]));
-    
-    let memory_block = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .title(Span::styled(" page allocation map ", Style::default().fg(DIM)))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(DIM)),
-        );
-    f.render_widget(memory_block, area);
+
+    // Render grid into Lines
+    let mut lines: Vec<Line> = Vec::with_capacity(rows);
+    for row in 0..rows {
+        let spans: Vec<Span> = grid[row].iter().map(|&(ch, brightness)| {
+            if brightness == 0 {
+                Span::styled(" ", Style::default())
+            } else if brightness == 255 {
+                // Head character: bright white
+                Span::styled(
+                    ch.to_string(),
+                    Style::default().fg(Color::Rgb(220, 255, 220)).add_modifier(Modifier::BOLD),
+                )
+            } else {
+                // Trail: green with fading intensity
+                let g = brightness;
+                Span::styled(
+                    ch.to_string(),
+                    Style::default().fg(Color::Rgb(0, g, 0)),
+                )
+            }
+        }).collect();
+        lines.push(Line::from(spans));
+    }
+
+    let para = Paragraph::new(lines);
+    f.render_widget(para, inner);
 }
 
 // ─── Tab: Projects ───────────────────────────────────────────────────────────
