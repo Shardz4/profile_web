@@ -123,12 +123,12 @@ struct MatrixCol {
 
 impl MatrixCol {
     fn new(seed: u64, max_height: u16) -> Self {
-        let matrix_chars: Vec<char> = "ｦｧｨｩｪｫｬｭｮｯｰ0123456789ABCDEF<>{}|/\\*+=-~^&"
+        let matrix_chars: Vec<char> = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺ0123456789ABCDEF<>{}|/\\*+=-~^&@#$%"
             .chars().collect();
-        let speed = ((seed % 4) as u8) + 2; // 2–5 ticks per drop
-        let trail_len = ((seed % 8) as u16) + 4; // 4–11 chars
-        let start_y = -((seed % (max_height as u64 + 6)) as i32); // stagger start
-        let chars: Vec<char> = (0..trail_len + 4)
+        let speed = ((seed % 3) as u8) + 1; // 1–3 ticks per drop (faster)
+        let trail_len = ((seed % 13) as u16) + 6; // 6–18 chars (longer trails)
+        let start_y = -((seed % (max_height as u64 / 2 + 3)) as i32); // shorter stagger = denser start
+        let chars: Vec<char> = (0..trail_len + 6)
             .map(|i| matrix_chars[((seed.wrapping_mul(7).wrapping_add(i as u64 * 13)) % matrix_chars.len() as u64) as usize])
             .collect();
         Self { head_y: start_y, speed, trail_len, chars }
@@ -237,7 +237,7 @@ impl App {
             konami_buffer: Vec::new(),
             konami_active: false,
             konami_ticks: 0,
-            matrix_cols: (0..60).map(|i| MatrixCol::new(i * 37 + 11, 30)).collect(),
+            matrix_cols: (0..120).map(|i| MatrixCol::new(i * 37 + 11, 30)).collect(),
         }
     }
     pub fn next_tab(&mut self) {
@@ -341,9 +341,9 @@ impl App {
             if self.tick_count % (col.speed as u64) == 0 {
                 col.head_y += 1;
                 // Reset when fully off screen
-                if col.head_y > 40 + col.trail_len as i32 {
+                if col.head_y > 50 + col.trail_len as i32 {
                     *col = MatrixCol::new(self.tick_count.wrapping_mul(7).wrapping_add(i as u64 * 31), 30);
-                    col.head_y = 0;
+                    col.head_y = -((self.tick_count.wrapping_add(i as u64 * 3) % 5) as i32);
                 }
                 // Rotate a char in the trail for flicker
                 let matrix_chars: Vec<char> = "ｦｧｨｩｪｫｬｭｮｯｰ0123456789ABCDEF<>{}|/\\*+=-~^&"
