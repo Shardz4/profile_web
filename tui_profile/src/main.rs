@@ -118,6 +118,16 @@ enum ShellState {
     Finished,
 }
 
+// ─── Achievements ───────────────────────────────────────────────────────────
+#[derive(Clone)]
+#[allow(dead_code)]
+struct Achievement {
+    name: &'static str,
+    description: &'static str,
+    icon: &'static str,
+    unlocked: bool,
+}
+
 // ─── Matrix Rain Column ─────────────────────────────────────────────────────
 struct MatrixCol {
     head_y: i32,
@@ -163,6 +173,9 @@ struct App {
     pub konami_active: bool,
     pub konami_ticks: u64,
     pub matrix_cols: Vec<MatrixCol>,
+    pub tabs_visited: [bool; 4],
+    pub achievements: Vec<Achievement>,
+    pub achievement_toast: Option<(String, String, u64)>, // (name, desc, show_until_tick)
 }
 
 impl App {
@@ -243,16 +256,77 @@ impl App {
             konami_active: false,
             konami_ticks: 0,
             matrix_cols: (0..120).map(|i| MatrixCol::new(i * 37 + 11, 30)).collect(),
+            tabs_visited: [true, false, false, false], // Home starts visited
+            achievements: vec![
+                Achievement {
+                    name: "Explorer",
+                    description: "Visit all 4 tabs",
+                    icon: "★",
+                    unlocked: false,
+                },
+                Achievement {
+                    name: "Retro Gamer",
+                    description: "Activate the Konami Code",
+                    icon: "🎮",
+                    unlocked: false,
+                },
+                Achievement {
+                    name: "Patient",
+                    description: "Stay for 2+ minutes",
+                    icon: "⏱",
+                    unlocked: false,
+                },
+                Achievement {
+                    name: "Boot Master",
+                    description: "Complete the boot sequence",
+                    icon: "⚡",
+                    unlocked: false,
+                },
+                Achievement {
+                    name: "First Contact",
+                    description: "Visit the Contact tab",
+                    icon: "✉",
+                    unlocked: false,
+                },
+            ],
+            achievement_toast: None,
         }
     }
     pub fn next_tab(&mut self) {
         self.tab_index = (self.tab_index + 1) % self.tab_titles.len();
+        self.mark_tab_visited();
     }
     pub fn prev_tab(&mut self) {
         if self.tab_index > 0 {
             self.tab_index -= 1;
         } else {
             self.tab_index = self.tab_titles.len() - 1;
+        }
+        self.mark_tab_visited();
+    }
+    pub fn mark_tab_visited(&mut self) {
+        if self.tab_index < 4 {
+            self.tabs_visited[self.tab_index] = true;
+        }
+        // Check "Explorer" achievement: all 4 tabs visited
+        if self.tabs_visited.iter().all(|&v| v) {
+            self.unlock_achievement(0); // Explorer
+        }
+        // Check "First Contact" achievement: Contact tab (index 3)
+        if self.tab_index == 3 {
+            self.unlock_achievement(4); // First Contact
+        }
+    }
+    pub fn unlock_achievement(&mut self, idx: usize) {
+        if let Some(ach) = self.achievements.get_mut(idx) {
+            if !ach.unlocked {
+                ach.unlocked = true;
+                self.achievement_toast = Some((
+                    ach.name.to_string(),
+                    ach.description.to_string(),
+                    self.tick_count + 360, // show for ~3 seconds at 120Hz
+                ));
+            }
         }
     }
     pub fn tick(&mut self) {
@@ -341,6 +415,23 @@ impl App {
             self.konami_active = false;
         }
 
+        // 7. Achievement tick checks
+        // "Patient" — 2+ minutes (120 ticks/s * 120s = 14400)
+        if self.tick_count == 14400 {
+            self.unlock_achievement(2); // Patient
+        }
+        // "Boot Master" — when boot_mode transitions to false (checked once)
+        if !self.boot_mode && self.tick_count > 10 {
+            // Only check once around the transition
+            self.unlock_achievement(3); // Boot Master
+        }
+        // Expire achievement toast
+        if let Some((_, _, until)) = &self.achievement_toast {
+            if self.tick_count > *until {
+                self.achievement_toast = None;
+            }
+        }
+
         // 6. Update matrix rain columns
         for (i, col) in self.matrix_cols.iter_mut().enumerate() {
             if self.tick_count % (col.speed as u64) == 0 {
@@ -377,6 +468,7 @@ impl App {
             self.konami_active = true;
             self.konami_ticks = self.tick_count;
             self.konami_buffer.clear();
+            self.unlock_achievement(1); // Retro Gamer
         }
     }
 }
@@ -442,10 +534,10 @@ where
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
                         KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
                         KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => app.prev_tab(),
-                        KeyCode::Char('1') => app.tab_index = 0,
-                        KeyCode::Char('2') => app.tab_index = 1,
-                        KeyCode::Char('3') => app.tab_index = 2,
-                        KeyCode::Char('4') => app.tab_index = 3,
+                        KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
+                        KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
+                        KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
+                        KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
                         _ => {}
                     }
                 }
@@ -572,10 +664,10 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                 match key_event.code {
                     KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
                     KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
-                    KeyCode::Char('1') => app.tab_index = 0,
-                    KeyCode::Char('2') => app.tab_index = 1,
-                    KeyCode::Char('3') => app.tab_index = 2,
-                    KeyCode::Char('4') => app.tab_index = 3,
+                    KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
+                    KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
+                    KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
+                    KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
                     KeyCode::Char('f') | KeyCode::Char('F') => {
                         request_fullscreen();
                     }
@@ -1033,6 +1125,59 @@ fn ui(f: &mut Frame, app: &App) {
     if app.konami_active {
         render_konami_overlay(f, app);
     }
+
+    // Achievement toast overlay (top-right corner)
+    if let Some((ref name, ref desc, _until)) = app.achievement_toast {
+        render_achievement_toast(f, app, name, desc);
+    }
+}
+
+fn render_achievement_toast(f: &mut Frame, app: &App, name: &str, desc: &str) {
+    let area = f.area();
+    let toast_w: u16 = 34;
+    let toast_h: u16 = 7;
+    // Position in top-right corner with 2-cell margin
+    let x = area.width.saturating_sub(toast_w + 2);
+    let y = 2;
+    let toast_area = Rect::new(x, y, toast_w.min(area.width), toast_h.min(area.height));
+
+    // Pulsing border color
+    let pulse = (app.tick_count / 20) % 3;
+    let border_color = match pulse {
+        0 => Color::Rgb(255, 215, 0),  // Gold
+        1 => Color::Rgb(0, 255, 200),  // Cyan-green
+        _ => Color::Rgb(180, 130, 255), // Lavender
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(BG));
+    let inner = block.inner(toast_area);
+    f.render_widget(block, toast_area);
+
+    let blink = (app.tick_count / 25) % 2 == 0;
+    let star = if blink { "★" } else { "☆" };
+
+    let lines = vec![
+        Line::from(Span::styled(
+            format!(" {} Achievement Unlocked {}", star, star),
+            Style::default().fg(border_color).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("  \"{}\" ", name),
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            format!("  {}", desc),
+            Style::default().fg(Color::Gray),
+        )),
+    ];
+
+    let para = Paragraph::new(lines);
+    f.render_widget(para, inner);
 }
 
 // ─── Header ─────────────────────────────────────────────────────────────────
