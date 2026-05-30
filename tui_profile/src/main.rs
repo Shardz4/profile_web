@@ -128,6 +128,29 @@ struct Achievement {
     unlocked: bool,
 }
 
+// ─── Particle ─────────────────────────────────────────────────────────────
+struct Particle {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    ch: char,
+    brightness: u8,
+}
+
+impl Particle {
+    fn new(seed: u64, max_w: u16, max_h: u16) -> Self {
+        let chars = ['\u{00b7}', '\u{2218}', '\u{00b0}', '\u{22c5}', '\u{2022}', '\u{2727}', '\u{2729}', '+'];
+        let x = (seed.wrapping_mul(31) % max_w as u64) as f32;
+        let y = (seed.wrapping_mul(17) % max_h as u64) as f32;
+        let vx = ((seed.wrapping_mul(7) % 21) as f32 - 10.0) * 0.008;
+        let vy = ((seed.wrapping_mul(13) % 10) as f32 + 2.0) * 0.012;
+        let ch = chars[(seed % chars.len() as u64) as usize];
+        let brightness = ((seed.wrapping_mul(11) % 60) + 30) as u8;
+        Self { x, y, vx, vy, ch, brightness }
+    }
+}
+
 // ─── Matrix Rain Column ─────────────────────────────────────────────────────
 struct MatrixCol {
     head_y: i32,
@@ -176,6 +199,7 @@ struct App {
     pub tabs_visited: [bool; 4],
     pub achievements: Vec<Achievement>,
     pub achievement_toast: Option<(String, String, u64)>, // (name, desc, show_until_tick)
+    pub particles: Vec<Particle>,
 }
 
 impl App {
@@ -290,6 +314,7 @@ impl App {
                 },
             ],
             achievement_toast: None,
+            particles: (0..40).map(|i| Particle::new(i * 47 + 13, 160, 50)).collect(),
         }
     }
     pub fn next_tab(&mut self) {
@@ -447,6 +472,21 @@ impl App {
                 let rot_idx = (self.tick_count.wrapping_add(i as u64)) as usize % col.chars.len();
                 let new_char_idx = (self.tick_count.wrapping_mul(13).wrapping_add(i as u64 * 7)) as usize % matrix_chars.len();
                 col.chars[rot_idx] = matrix_chars[new_char_idx];
+            }
+        }
+
+        // 8. Update particles
+        for (i, p) in self.particles.iter_mut().enumerate() {
+            p.x += p.vx;
+            p.y += p.vy;
+            // Wrap around screen edges
+            if p.x < 0.0 { p.x += 160.0; }
+            if p.x >= 160.0 { p.x -= 160.0; }
+            if p.y < 0.0 { p.y += 50.0; }
+            if p.y >= 50.0 { p.y -= 50.0; }
+            // Subtle brightness flicker every ~90 ticks per particle
+            if (self.tick_count + i as u64 * 7) % 90 == 0 {
+                p.brightness = ((p.brightness as u16 + 15) % 70 + 25) as u8;
             }
         }
     }
@@ -1093,6 +1133,9 @@ fn ui(f: &mut Frame, app: &App) {
     let size = f.area();
     let accent = app.get_accent_color();
 
+    // Render particle background as the very first layer
+    render_particles(f, app);
+
     if app.boot_mode {
         render_boot_screen(f, app, accent);
     } else {
@@ -1129,6 +1172,26 @@ fn ui(f: &mut Frame, app: &App) {
     // Achievement toast overlay (top-right corner)
     if let Some((ref name, ref desc, _until)) = app.achievement_toast {
         render_achievement_toast(f, app, name, desc);
+    }
+}
+
+fn render_particles(f: &mut Frame, app: &App) {
+    let area = f.area();
+    let buf = f.buffer_mut();
+    for p in &app.particles {
+        let px = p.x as u16;
+        let py = p.y as u16;
+        // Only draw within visible area
+        if px >= area.x && px < area.x + area.width && py >= area.y && py < area.y + area.height {
+            let cell = buf.get_mut(px, py);
+            // Only render into empty/space cells so particles don't overwrite content
+            let sym = cell.symbol();
+            if sym == " " || sym == "" {
+                let g = (p.brightness as u16).min(90) as u8;
+                cell.set_char(p.ch);
+                cell.set_fg(Color::Rgb(g / 2, g, g / 2)); // dim green tint
+            }
+        }
     }
 }
 
