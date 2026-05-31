@@ -7,8 +7,7 @@ pub mod skills;
 pub mod contact;
 
 use crate::platform::*;
-use crate::{App, BG, DIM};
-use crate::effects::glitch_str;
+use crate::{App, BG};
 
 // ─── Root UI ────────────────────────────────────────────────────────────────
 pub fn ui(f: &mut Frame, app: &App) {
