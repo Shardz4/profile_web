@@ -47,10 +47,21 @@ use platform::*;
 use std::error::Error;
 
 // ─── Palette ────────────────────────────────────────────────────────────────
-// ACCENT color is determined dynamically in App::get_accent_color()
+// Colors are now theme-aware via App methods; these are defaults/fallbacks.
 const DIM: Color = Color::DarkGray;
 const FG: Color = Color::White;
 const BG: Color = Color::Black;
+
+// ─── Theme System ───────────────────────────────────────────────────────────
+const THEME_COUNT: usize = 6;
+const THEME_NAMES: [&str; THEME_COUNT] = [
+    "Cyber Neon",
+    "Retro Amber",
+    "Matrix Green",
+    "Vapor Wave",
+    "Dracula",
+    "Nord Frost",
+];
 
 // ─── Responsive Breakpoints ─────────────────────────────────────────────────
 const NARROW: u16 = 80;
@@ -200,6 +211,7 @@ struct App {
     pub achievements: Vec<Achievement>,
     pub achievement_toast: Option<(String, String, u64)>, // (name, desc, show_until_tick)
     pub particles: Vec<Particle>,
+    pub current_theme: usize,
 }
 
 impl App {
@@ -315,6 +327,7 @@ impl App {
             ],
             achievement_toast: None,
             particles: (0..40).map(|i| Particle::new(i * 47 + 13, 160, 50)).collect(),
+            current_theme: 0,
         }
     }
     pub fn next_tab(&mut self) {
@@ -492,11 +505,42 @@ impl App {
     }
     pub fn get_accent_color(&self) -> Color {
         let t = self.tick_count as f64 * 0.02;
-        // Smoothly cycle through neon green/teal/blue range
-        let r = 0;
-        let g = ((t.sin() * 40.0) + 215.0) as u8; // 175 to 255
-        let b = (((t + 3.14).sin() * 40.0) + 215.0) as u8; // 175 to 255
-        Color::Rgb(r, g, b)
+        match self.current_theme {
+            0 => { // Cyber Neon — cycling green/teal
+                let g = ((t.sin() * 40.0) + 215.0) as u8;
+                let b = (((t + 3.14).sin() * 40.0) + 215.0) as u8;
+                Color::Rgb(0, g, b)
+            }
+            1 => { // Retro Amber — warm amber phosphor
+                let v = ((t.sin() * 20.0) + 235.0) as u8;
+                Color::Rgb(v, ((v as f64) * 0.69) as u8, 0)
+            }
+            2 => { // Matrix Green — pure neon green
+                let v = ((t.sin() * 30.0) + 225.0) as u8;
+                Color::Rgb(0, v, ((v as f64) * 0.25) as u8)
+            }
+            3 => { // Vapor Wave — pink/purple cycling
+                let r = ((t.sin() * 30.0) + 225.0) as u8;
+                let b = (((t + 2.0).sin() * 40.0) + 215.0) as u8;
+                Color::Rgb(r, ((r as f64) * 0.44) as u8, b)
+            }
+            4 => { // Dracula — purple accent
+                let v = ((t.sin() * 25.0) + 230.0) as u8;
+                Color::Rgb(((v as f64) * 0.74) as u8, ((v as f64) * 0.57) as u8, v)
+            }
+            5 => { // Nord Frost — cool blue/cyan
+                let b = ((t.sin() * 25.0) + 220.0) as u8;
+                let g = (((t + 1.5).sin() * 20.0) + 190.0) as u8;
+                Color::Rgb(((b as f64) * 0.53) as u8, g, b)
+            }
+            _ => Color::White,
+        }
+    }
+    pub fn get_theme_name(&self) -> &'static str {
+        THEME_NAMES[self.current_theme % THEME_COUNT]
+    }
+    pub fn cycle_theme(&mut self) {
+        self.current_theme = (self.current_theme + 1) % THEME_COUNT;
     }
     pub fn register_key(&mut self, c: char) {
         self.konami_buffer.push(c);
@@ -578,6 +622,7 @@ where
                         KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                         KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
                         KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                        KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
                         _ => {}
                     }
                 }
@@ -708,6 +753,7 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                     KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
                     KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                    KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
                     KeyCode::Char('f') | KeyCode::Char('F') => {
                         request_fullscreen();
                     }
@@ -1177,19 +1223,30 @@ fn ui(f: &mut Frame, app: &App) {
 
 fn render_particles(f: &mut Frame, app: &App) {
     let area = f.area();
+    let accent = app.get_accent_color();
+    // Extract accent RGB for tinting particles
+    let (ar, ag, ab) = match accent {
+        Color::Rgb(r, g, b) => (r, g, b),
+        _ => (0, 200, 180),
+    };
     let buf = f.buffer_mut();
     for p in &app.particles {
         let px = p.x as u16;
         let py = p.y as u16;
         // Only draw within visible area
         if px >= area.x && px < area.x + area.width && py >= area.y && py < area.y + area.height {
-            let cell = buf.get_mut(px, py);
-            // Only render into empty/space cells so particles don't overwrite content
-            let sym = cell.symbol();
-            if sym == " " || sym == "" {
-                let g = (p.brightness as u16).min(90) as u8;
-                cell.set_char(p.ch);
-                cell.set_fg(Color::Rgb(g / 2, g, g / 2)); // dim green tint
+            if let Some(cell) = buf.cell_mut((px, py)) {
+                // Only render into empty/space cells so particles don't overwrite content
+                let sym = cell.symbol().to_string();
+                if sym == " " || sym.is_empty() {
+                    let dim = (p.brightness as f32) / 255.0 * 0.35; // keep subtle
+                    cell.set_char(p.ch);
+                    cell.set_fg(Color::Rgb(
+                        (ar as f32 * dim) as u8,
+                        (ag as f32 * dim) as u8,
+                        (ab as f32 * dim) as u8,
+                    ));
+                }
             }
         }
     }
@@ -1973,6 +2030,9 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled("1-4 ", Style::default().fg(accent)),
         Span::styled("jump", Style::default().fg(DIM)),
         Span::styled("  │  ", Style::default().fg(DIM)),
+        Span::styled("t ", Style::default().fg(accent)),
+        Span::styled("theme", Style::default().fg(DIM)),
+        Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled("f ", Style::default().fg(accent)),
         Span::styled("fullscreen", Style::default().fg(DIM)),
         Span::styled("  │  ", Style::default().fg(DIM)),
@@ -1981,6 +2041,8 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled("exit fullscreen", Style::default().fg(DIM)),
         #[cfg(not(target_arch = "wasm32"))]
         Span::styled("quit", Style::default().fg(DIM)),
+        Span::styled("  │  ", Style::default().fg(DIM)),
+        Span::styled(format!("◆ {}", app.get_theme_name()), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
         Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled(format!("FPS: {:.1}", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
     ]))
