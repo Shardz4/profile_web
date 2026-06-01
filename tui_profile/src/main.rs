@@ -95,6 +95,7 @@ pub struct App {
     pub achievement_toast: Option<(String, String, u64)>, // (name, desc, show_until_tick)
     pub particles: Vec<Particle>,
     pub current_theme: usize,
+    pub selected_skill_idx: usize,
 }
 
 impl App {
@@ -211,6 +212,7 @@ impl App {
             achievement_toast: None,
             particles: (0..40).map(|i| Particle::new(i * 47 + 13, 160, 50)).collect(),
             current_theme: 0,
+            selected_skill_idx: 0,
         }
     }
 
@@ -226,6 +228,17 @@ impl App {
             self.tab_index = self.tab_titles.len() - 1;
         }
         self.mark_tab_visited();
+    }
+
+    pub fn move_skill_selection(&mut self, dir: usize) {
+        if self.tab_index != 2 {
+            return;
+        }
+        let current = &ui::skills::SKILL_NODES[self.selected_skill_idx];
+        let target_id = current.nav[dir];
+        if let Some(idx) = ui::skills::SKILL_NODES.iter().position(|n| n.id == target_id) {
+            self.selected_skill_idx = idx;
+        }
     }
 
     pub fn mark_tab_visited(&mut self) {
@@ -470,13 +483,31 @@ where
                 } else {
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
-                        KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
-                        KeyCode::Left | KeyCode::Char('h') | KeyCode::BackTab => app.prev_tab(),
                         KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
                         KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                         KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
                         KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
                         KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
+                        KeyCode::Tab => app.next_tab(),
+                        KeyCode::BackTab => app.prev_tab(),
+                        
+                        // Skills graph navigation (only on Skills tab)
+                        KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('k') if app.tab_index == 2 => {
+                            app.move_skill_selection(0);
+                        }
+                        KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('j') if app.tab_index == 2 => {
+                            app.move_skill_selection(1);
+                        }
+                        KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('h') if app.tab_index == 2 => {
+                            app.move_skill_selection(2);
+                        }
+                        KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('l') if app.tab_index == 2 => {
+                            app.move_skill_selection(3);
+                        }
+
+                        // Normal tab navigation (on other tabs)
+                        KeyCode::Right | KeyCode::Char('l') => app.next_tab(),
+                        KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
                         _ => {}
                     }
                 }
@@ -602,8 +633,6 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                 }
             } else {
                 match key_event.code {
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
-                    KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
                     KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
                     KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                     KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
@@ -615,6 +644,25 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         exit_fullscreen();
                     }
+                    KeyCode::Tab => app.next_tab(),
+
+                    // Skills graph navigation (only on Skills tab)
+                    KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('k') if app.tab_index == 2 => {
+                        app.move_skill_selection(0);
+                    }
+                    KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('j') if app.tab_index == 2 => {
+                        app.move_skill_selection(1);
+                    }
+                    KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('h') if app.tab_index == 2 => {
+                        app.move_skill_selection(2);
+                    }
+                    KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('l') if app.tab_index == 2 => {
+                        app.move_skill_selection(3);
+                    }
+
+                    // Normal tab navigation (on other tabs)
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
+                    KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
                     _ => {}
                 }
             }

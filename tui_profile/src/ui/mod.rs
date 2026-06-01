@@ -61,7 +61,7 @@ fn render_body(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     match app.tab_index {
         0 => home::render_home(f, area, app, accent),
         1 => projects::render_projects(f, area, accent),
-        2 => skills::render_skills(f, area, accent),
+        2 => skills::render_skills(f, area, app, accent),
         3 => contact::render_contact(f, area, accent),
         _ => {}
     }

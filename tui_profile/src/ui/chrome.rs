@@ -57,9 +57,22 @@ pub fn render_tabs(f: &mut Frame, area: Rect, app: &App, accent: Color) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 pub fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled(" ← → ", Style::default().fg(accent)),
-        Span::styled("navigate", Style::default().fg(DIM)),
+    let mut footer_spans = if app.tab_index == 2 {
+        vec![
+            Span::styled(" Tab ", Style::default().fg(accent)),
+            Span::styled("change tab", Style::default().fg(DIM)),
+            Span::styled("  │  ", Style::default().fg(DIM)),
+            Span::styled("Arrows/WASD ", Style::default().fg(accent)),
+            Span::styled("navigate graph", Style::default().fg(DIM)),
+        ]
+    } else {
+        vec![
+            Span::styled(" ← → ", Style::default().fg(accent)),
+            Span::styled("navigate", Style::default().fg(DIM)),
+        ]
+    };
+
+    footer_spans.extend(vec![
         Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled("1-4 ", Style::default().fg(accent)),
         Span::styled("jump", Style::default().fg(DIM)),
@@ -79,7 +92,9 @@ pub fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         Span::styled(format!("◆ {}", app.get_theme_name()), Style::default().fg(accent).add_modifier(Modifier::BOLD)),
         Span::styled("  │  ", Style::default().fg(DIM)),
         Span::styled(format!("FPS: {:.1}", app.fps_tracker.fps), Style::default().fg(Color::Yellow)),
-    ]))
-    .alignment(Alignment::Center);
+    ]);
+
+    let footer = Paragraph::new(Line::from(footer_spans))
+        .alignment(Alignment::Center);
     f.render_widget(footer, area);
 }
