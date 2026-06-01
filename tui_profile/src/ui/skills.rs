@@ -375,14 +375,7 @@ fn render_skills_narrow(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         })
         .collect();
 
-    let list = List::new(list_items)
-        .block(
-            Block::default()
-                .title(Span::styled(" skill nodes ", Style::default().fg(DIM)))
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(DIM)),
-        );
+
 
     // Let the list show the selected item centered (approximate list state)
     // Ratatui list doesn't auto-scroll unless we pass a state. Since this is a simple list,

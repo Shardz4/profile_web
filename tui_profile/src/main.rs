@@ -661,7 +661,7 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     }
 
                     // Normal tab navigation (on other tabs)
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => app.next_tab(),
+                    KeyCode::Right | KeyCode::Char('l') => app.next_tab(),
                     KeyCode::Left | KeyCode::Char('h') => app.prev_tab(),
                     _ => {}
                 }
