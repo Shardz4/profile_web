@@ -90,7 +90,7 @@ pub struct App {
     pub konami_active: bool,
     pub konami_ticks: u64,
     pub matrix_cols: Vec<MatrixCol>,
-    pub tabs_visited: [bool; 4],
+    pub tabs_visited: [bool; 5],
     pub achievements: Vec<Achievement>,
     pub achievement_toast: Option<(String, String, u64)>, // (name, desc, show_until_tick)
     pub particles: Vec<Particle>,
@@ -156,7 +156,7 @@ impl App {
 
         App {
             tab_index: 0,
-            tab_titles: vec!["  Home  ", "  Projects  ", "  Skills  ", "  Contact  "],
+            tab_titles: vec!["  Home  ", "  Projects  ", "  Skills  ", "  Contact  ", "  Achievements  "],
             fps_tracker: FpsTracker::new(),
             tick_count: 0,
             cpu_cores: vec![0.0; 8],
@@ -176,11 +176,11 @@ impl App {
             konami_active: false,
             konami_ticks: 0,
             matrix_cols: (0..120).map(|i| MatrixCol::new(i * 37 + 11, 30)).collect(),
-            tabs_visited: [true, false, false, false], // Home starts visited
+            tabs_visited: [true, false, false, false, false], // Home starts visited
             achievements: vec![
                 Achievement {
                     name: "Explorer",
-                    description: "Visit all 4 tabs",
+                    description: "Visit all 5 tabs",
                     icon: "★",
                     unlocked: false,
                 },
@@ -242,10 +242,10 @@ impl App {
     }
 
     pub fn mark_tab_visited(&mut self) {
-        if self.tab_index < 4 {
+        if self.tab_index < 5 {
             self.tabs_visited[self.tab_index] = true;
         }
-        // Check "Explorer" achievement: all 4 tabs visited
+        // Check "Explorer" achievement: all 5 tabs visited
         if self.tabs_visited.iter().all(|&v| v) {
             self.unlock_achievement(0); // Explorer
         }
@@ -487,6 +487,7 @@ where
                         KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                         KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
                         KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                        KeyCode::Char('5') => { app.tab_index = 4; app.mark_tab_visited(); },
                         KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
                         KeyCode::Tab => app.next_tab(),
                         KeyCode::BackTab => app.prev_tab(),
@@ -637,6 +638,7 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
                     KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
                     KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                    KeyCode::Char('5') => { app.tab_index = 4; app.mark_tab_visited(); },
                     KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
                     KeyCode::Char('f') | KeyCode::Char('F') => {
                         request_fullscreen();

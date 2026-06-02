@@ -5,6 +5,7 @@ pub mod home;
 pub mod projects;
 pub mod skills;
 pub mod contact;
+pub mod achievements;
 
 use crate::platform::*;
 use crate::{App, BG};
@@ -62,7 +63,8 @@ fn render_body(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         0 => home::render_home(f, area, app, accent),
         1 => projects::render_projects(f, area, accent),
         2 => skills::render_skills(f, area, app, accent),
-        3 => contact::render_contact(f, area, app, accent),
+        3 => contact::render_contact(f, area, accent),
+        4 => achievements::render_achievements(f, area, app, accent),
         _ => {}
     }
 }
