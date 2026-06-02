@@ -156,7 +156,7 @@ impl App {
 
         App {
             tab_index: 0,
-            tab_titles: vec!["  Home  ", "  Projects  ", "  Skills  ", "  Contact  ", "  Achievements  "],
+            tab_titles: vec!["  Home  ", "  Projects  ", "  Skills  ", "  Contact  ", "  Trophy Cabinet  "],
             fps_tracker: FpsTracker::new(),
             tick_count: 0,
             cpu_cores: vec![0.0; 8],
