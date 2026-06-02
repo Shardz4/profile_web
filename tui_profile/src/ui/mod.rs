@@ -62,7 +62,7 @@ fn render_body(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         0 => home::render_home(f, area, app, accent),
         1 => projects::render_projects(f, area, accent),
         2 => skills::render_skills(f, area, app, accent),
-        3 => contact::render_contact(f, area, accent),
+        3 => contact::render_contact(f, area, app, accent),
         _ => {}
     }
 }
