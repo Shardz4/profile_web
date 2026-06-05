@@ -5,29 +5,24 @@ use crate::{DIM, FG};
 pub fn render_projects(f: &mut Frame, area: Rect, accent: Color) {
     let projects = vec![
         (
-            "[Bare-Metal OS / Kernel]",
-            "C / Rust / Assembly",
-            "Implementing custom OS components, from demand paging to AI-integrated error detection.",
+            "[Real-Time ADAS Pilot (Hybrid Engine)]",
+            "Rust · Python · PyO3 · YOLOv8",
+            "Hybrid perception pipeline with Python YOLOv8 inference and low-latency Rust physics/tracking.",
         ),
         (
-            "[High-Concurrency Engine]",
-            "Rust / C++",
-            "Building memory-safe, high-concurrency engines with lock-free queues and parallel architecture.",
+            "[Alter-Ego: Universal Prediction Market (DeFi)]",
+            "Solidity · Next.js · Wagmi · TypeScript",
+            "Decentralized prediction market on Ethereum with CPMM liquidity pool and DAO governance.",
         ),
         (
-            "[Real-Time CV Pipeline]",
-            "C++ / PyTorch / CUDA",
-            "Optimizing perception pipelines with TensorRT and OpenCV for unstructured environments.",
+            "[Bare-Metal OS & Kernel Dev]",
+            "C · Rust · x86_64 Assembly",
+            "Hobby kernel components, demand paging, custom slab allocators, and interrupt routing.",
         ),
         (
-            "[Distributed Systems Engine]",
-            "Rust",
-            "High-performance distributed systems architecture designed for resilience and concurrency.",
-        ),
-        (
-            "[Algorithmic Solver]",
-            "C++",
-            "Custom implementations for complex algorithmic problems optimized for time and space.",
+            "[Distributed Consensus Engine]",
+            "Rust · Tokio · gRPC",
+            "High-performance implementation of Raft consensus protocol with distributed replication.",
         ),
     ];
 
