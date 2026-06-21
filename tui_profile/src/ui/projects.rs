@@ -218,82 +218,34 @@ fn render_project_card(
         let km_focused = focus == ProjectFocus::KnowMore;
         let gh_focused = focus == ProjectFocus::GitHub;
 
-        let km_bg = if km_focused {
-            accent
+        let km_style = if km_focused {
+            Style::default().fg(accent).add_modifier(Modifier::BOLD)
         } else {
-            Color::Rgb(22, 27, 34)
+            Style::default().fg(DIM)
         };
-        let km_fg = if km_focused {
-            Color::Black
+        let gh_style = if gh_focused {
+            Style::default().fg(Color::Rgb(110, 84, 148)).add_modifier(Modifier::BOLD)
         } else {
-            accent
+            Style::default().fg(DIM)
         };
-        let km_border = if km_focused {
-            accent
-        } else {
-            Color::Rgb(48, 54, 61)
-        };
-
-        let gh_bg = if gh_focused {
-            Color::Rgb(48, 54, 61)
-        } else {
-            Color::Rgb(33, 38, 45)
-        };
-        let gh_fg = if gh_focused {
-            Color::Rgb(240, 246, 252)
-        } else {
-            Color::Rgb(201, 209, 217)
-        };
-        let gh_border = if gh_focused {
-            Color::Rgb(139, 148, 158)
-        } else {
-            Color::Rgb(48, 54, 61)
-        };
-
-        let km_style = Style::default().fg(km_fg).bg(km_bg);
-        let gh_style = Style::default().fg(gh_fg).bg(gh_bg).add_modifier(Modifier::BOLD);
 
         let km_label = if km_focused {
-            " ⏎ KNOW MORE "
+            "▶ [ KNOW MORE ]"
         } else {
-            "   KNOW MORE "
+            "  [ KNOW MORE ]"
         };
         let gh_label = if gh_focused {
-            " ⏎ \u{f09b} GITHUB "
+            "▶ [ \u{f09b} GITHUB ]"
         } else {
-            "   \u{f09b} GITHUB "
+            "  [ \u{f09b} GITHUB ]"
         };
 
         let btn_line = Line::from(vec![
-            Span::styled("┌", Style::default().fg(km_border).bg(km_bg)),
             Span::styled(km_label, km_style),
-            Span::styled("┐", Style::default().fg(km_border).bg(km_bg)),
-            Span::styled("  ", Style::default()),
-            Span::styled("┌", Style::default().fg(gh_border).bg(gh_bg)),
+            Span::styled("    ", Style::default()),
             Span::styled(gh_label, gh_style),
-            Span::styled("┐", Style::default().fg(gh_border).bg(gh_bg)),
         ]);
         f.render_widget(Paragraph::new(btn_line), btn_area);
-
-        // Bottom border of buttons
-        if area.height > 3 {
-            let border_area = Rect::new(area.x + 7, area.y + 4, area.width.saturating_sub(7), 1);
-            let km_w = km_label.chars().count();
-            let gh_w = gh_label.chars().count();
-            let km_border_line = "─".repeat(km_w);
-            let gh_border_line = "─".repeat(gh_w);
-
-            let border_line = Line::from(vec![
-                Span::styled("└", Style::default().fg(km_border).bg(km_bg)),
-                Span::styled(km_border_line, Style::default().fg(km_border).bg(km_bg)),
-                Span::styled("┘", Style::default().fg(km_border).bg(km_bg)),
-                Span::styled("  ", Style::default()),
-                Span::styled("└", Style::default().fg(gh_border).bg(gh_bg)),
-                Span::styled(gh_border_line, Style::default().fg(gh_border).bg(gh_bg)),
-                Span::styled("┘", Style::default().fg(gh_border).bg(gh_bg)),
-            ]);
-            f.render_widget(Paragraph::new(border_line), border_area);
-        }
     }
 }
 
