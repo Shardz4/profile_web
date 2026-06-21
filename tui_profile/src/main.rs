@@ -56,6 +56,7 @@ pub mod ui;
 use effects::{FpsTracker, Particle, MatrixCol};
 use events::{ShellState, Achievement, KONAMI_SEQUENCE};
 use theme::THEME_COUNT;
+use ui::projects::{ProjectFocus, PROJECT_COUNT, PROJECTS};
 
 // ─── Palette (defaults / fallbacks) ─────────────────────────────────────────
 pub const DIM: Color = Color::DarkGray;
@@ -96,6 +97,11 @@ pub struct App {
     pub particles: Vec<Particle>,
     pub current_theme: usize,
     pub selected_skill_idx: usize,
+    // ─── Projects state ─────────────────────────────────────────────────────
+    pub project_selected_idx: usize,
+    pub project_detail_view: bool,
+    pub project_focus: ProjectFocus,
+    pub project_detail_scroll: u16,
 }
 
 impl App {
@@ -213,6 +219,10 @@ impl App {
             particles: (0..40).map(|i| Particle::new(i * 47 + 13, 160, 50)).collect(),
             current_theme: 0,
             selected_skill_idx: 0,
+            project_selected_idx: 0,
+            project_detail_view: false,
+            project_focus: ProjectFocus::KnowMore,
+            project_detail_scroll: 0,
         }
     }
 
@@ -239,6 +249,29 @@ impl App {
         if let Some(idx) = ui::skills::SKILL_NODES.iter().position(|n| n.id == target_id) {
             self.selected_skill_idx = idx;
         }
+    }
+
+    pub fn project_select_up(&mut self) {
+        if self.project_selected_idx > 0 {
+            self.project_selected_idx -= 1;
+        }
+    }
+
+    pub fn project_select_down(&mut self) {
+        if self.project_selected_idx < PROJECT_COUNT - 1 {
+            self.project_selected_idx += 1;
+        }
+    }
+
+    pub fn toggle_project_focus(&mut self) {
+        self.project_focus = match self.project_focus {
+            ProjectFocus::KnowMore => ProjectFocus::GitHub,
+            ProjectFocus::GitHub => ProjectFocus::KnowMore,
+        };
+    }
+
+    pub fn get_selected_github_url(&self) -> &'static str {
+        PROJECTS[self.project_selected_idx].github_url
     }
 
     pub fn mark_tab_visited(&mut self) {
@@ -480,6 +513,61 @@ where
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
                         _ => {}
                     }
+                } else if app.project_detail_view && app.tab_index == 1 {
+                    // ── Project detail view keybindings ──
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Backspace => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                        }
+                        KeyCode::Enter => {
+                            let url = app.get_selected_github_url();
+                            open_url_native(url);
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            app.project_detail_scroll = app.project_detail_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            app.project_detail_scroll += 1;
+                        }
+                        KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(()),
+                        _ => {}
+                    }
+                } else if app.tab_index == 1 {
+                    // ── Project list view keybindings ──
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
+                        KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('w') => {
+                            app.project_select_up();
+                        }
+                        KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('s') => {
+                            app.project_select_down();
+                        }
+                        KeyCode::Left | KeyCode::Right => {
+                            app.toggle_project_focus();
+                        }
+                        KeyCode::Enter => {
+                            match app.project_focus {
+                                ProjectFocus::KnowMore => {
+                                    app.project_detail_view = true;
+                                    app.project_detail_scroll = 0;
+                                }
+                                ProjectFocus::GitHub => {
+                                    let url = app.get_selected_github_url();
+                                    open_url_native(url);
+                                }
+                            }
+                        }
+                        KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
+                        KeyCode::Tab => app.next_tab(),
+                        KeyCode::BackTab => app.prev_tab(),
+                        KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
+                        KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
+                        KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
+                        KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                        KeyCode::Char('5') => { app.tab_index = 4; app.mark_tab_visited(); },
+                        _ => {}
+                    }
                 } else {
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
@@ -515,6 +603,16 @@ where
             }
         }
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn open_url_native(url: &str) {
+    #[cfg(target_os = "windows")]
+    { let _ = std::process::Command::new("cmd").args(["/C", "start", url]).spawn(); }
+    #[cfg(target_os = "macos")]
+    { let _ = std::process::Command::new("open").arg(url).spawn(); }
+    #[cfg(target_os = "linux")]
+    { let _ = std::process::Command::new("xdg-open").arg(url).spawn(); }
 }
 
 // ─── Entry Point (WASM) ─────────────────────────────────────────────────────
@@ -557,11 +655,15 @@ use ratzilla::WebRenderer;
             document.dispatchEvent(event);
         }, { once: true });
     }
+    export function open_url_js(url) {
+        window.open(url, '_blank');
+    }
 "#)]
 extern "C" {
     fn request_fullscreen();
     fn exit_fullscreen();
     fn setup_fullscreen_click();
+    fn open_url_js(url: &str);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -630,6 +732,67 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         exit_fullscreen();
                     }
+                    _ => {}
+                }
+            } else if app.project_detail_view && app.tab_index == 1 {
+                // ── Project detail view keybindings (WASM) ──
+                match key_event.code {
+                    KeyCode::Esc | KeyCode::Backspace => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                    }
+                    KeyCode::Enter => {
+                        let url = app.get_selected_github_url();
+                        open_url_js(url);
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        app.project_detail_scroll = app.project_detail_scroll.saturating_sub(1);
+                    }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        app.project_detail_scroll += 1;
+                    }
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        exit_fullscreen();
+                    }
+                    _ => {}
+                }
+            } else if app.tab_index == 1 {
+                // ── Project list view keybindings (WASM) ──
+                match key_event.code {
+                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('w') => {
+                        app.project_select_up();
+                    }
+                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('s') => {
+                        app.project_select_down();
+                    }
+                    KeyCode::Left | KeyCode::Right => {
+                        app.toggle_project_focus();
+                    }
+                    KeyCode::Enter => {
+                        match app.project_focus {
+                            ProjectFocus::KnowMore => {
+                                app.project_detail_view = true;
+                                app.project_detail_scroll = 0;
+                            }
+                            ProjectFocus::GitHub => {
+                                let url = app.get_selected_github_url();
+                                open_url_js(url);
+                            }
+                        }
+                    }
+                    KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
+                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                        request_fullscreen();
+                    }
+                    KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        exit_fullscreen();
+                    }
+                    KeyCode::Tab => app.next_tab(),
+                    KeyCode::Char('1') => { app.tab_index = 0; app.mark_tab_visited(); },
+                    KeyCode::Char('2') => { app.tab_index = 1; app.mark_tab_visited(); },
+                    KeyCode::Char('3') => { app.tab_index = 2; app.mark_tab_visited(); },
+                    KeyCode::Char('4') => { app.tab_index = 3; app.mark_tab_visited(); },
+                    KeyCode::Char('5') => { app.tab_index = 4; app.mark_tab_visited(); },
                     _ => {}
                 }
             } else {

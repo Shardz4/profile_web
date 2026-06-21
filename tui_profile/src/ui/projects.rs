@@ -155,7 +155,7 @@ pub fn render_projects(f: &mut Frame, area: Rect, app: &App, accent: Color) {
         .split(inner);
 
     for (i, proj) in PROJECTS.iter().enumerate() {
-        if i >= slots.len() - 1 {
+        if i >= slots.len().saturating_sub(1) {
             break;
         }
         let slot = slots[i];

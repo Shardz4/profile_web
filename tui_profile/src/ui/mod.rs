@@ -61,7 +61,13 @@ pub fn ui(f: &mut Frame, app: &App) {
 fn render_body(f: &mut Frame, area: Rect, app: &App, accent: Color) {
     match app.tab_index {
         0 => home::render_home(f, area, app, accent),
-        1 => projects::render_projects(f, area, accent),
+        1 => {
+            if app.project_detail_view {
+                projects::render_project_detail(f, area, app, accent)
+            } else {
+                projects::render_projects(f, area, app, accent)
+            }
+        }
         2 => skills::render_skills(f, area, app, accent),
         3 => contact::render_contact(f, area, accent),
         4 => achievements::render_achievements(f, area, app, accent),

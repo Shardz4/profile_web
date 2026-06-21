@@ -57,7 +57,31 @@ pub fn render_tabs(f: &mut Frame, area: Rect, app: &App, accent: Color) {
 
 // ─── Footer ──────────────────────────────────────────────────────────────────
 pub fn render_footer(f: &mut Frame, area: Rect, app: &App, accent: Color) {
-    let mut footer_spans = if app.tab_index == 2 {
+    let mut footer_spans = if app.project_detail_view && app.tab_index == 1 {
+        // Project detail view
+        vec![
+            Span::styled(" Esc ", Style::default().fg(accent)),
+            Span::styled("back", Style::default().fg(DIM)),
+            Span::styled("  │  ", Style::default().fg(DIM)),
+            Span::styled("Enter ", Style::default().fg(accent)),
+            Span::styled("github", Style::default().fg(DIM)),
+            Span::styled("  │  ", Style::default().fg(DIM)),
+            Span::styled("↑↓ ", Style::default().fg(accent)),
+            Span::styled("scroll", Style::default().fg(DIM)),
+        ]
+    } else if app.tab_index == 1 {
+        // Project list view
+        vec![
+            Span::styled(" ↑↓ ", Style::default().fg(accent)),
+            Span::styled("select", Style::default().fg(DIM)),
+            Span::styled("  │  ", Style::default().fg(DIM)),
+            Span::styled("←→ ", Style::default().fg(accent)),
+            Span::styled("focus", Style::default().fg(DIM)),
+            Span::styled("  │  ", Style::default().fg(DIM)),
+            Span::styled("Enter ", Style::default().fg(accent)),
+            Span::styled("action", Style::default().fg(DIM)),
+        ]
+    } else if app.tab_index == 2 {
         vec![
             Span::styled(" Tab ", Style::default().fg(accent)),
             Span::styled("change tab", Style::default().fg(DIM)),
