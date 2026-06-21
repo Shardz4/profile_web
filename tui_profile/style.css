@@ -75,6 +75,7 @@ html, body {
     display: block;
     outline: none;
     border-radius: 0;
+    font-family: 'JetBrains Mono', 'Font Awesome 6 Free', 'Font Awesome 6 Brands', monospace;
 
     /* Phosphor glow + steady-state CRT tone */
     filter: brightness(1.04) contrast(1.06) saturate(1.05);

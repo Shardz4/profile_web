@@ -218,43 +218,60 @@ fn render_project_card(
         let km_focused = focus == ProjectFocus::KnowMore;
         let gh_focused = focus == ProjectFocus::GitHub;
 
-        let km_style = if km_focused {
-            Style::default()
-                .fg(Color::Black)
-                .bg(accent)
-                .add_modifier(Modifier::BOLD)
+        let km_bg = if km_focused {
+            accent
         } else {
-            Style::default().fg(accent)
+            Color::Rgb(22, 27, 34)
         };
-        let gh_style = if gh_focused {
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Rgb(110, 84, 148))
-                .add_modifier(Modifier::BOLD)
+        let km_fg = if km_focused {
+            Color::Black
         } else {
-            Style::default().fg(Color::Rgb(110, 84, 148))
+            accent
+        };
+        let km_border = if km_focused {
+            accent
+        } else {
+            Color::Rgb(48, 54, 61)
         };
 
-        // Ratatui-style bordered button widgets
-        let km_label = if km_focused {
-            " ⏎ know_more "
+        let gh_bg = if gh_focused {
+            Color::Rgb(48, 54, 61)
         } else {
-            "   know_more "
+            Color::Rgb(33, 38, 45)
+        };
+        let gh_fg = if gh_focused {
+            Color::Rgb(240, 246, 252)
+        } else {
+            Color::Rgb(201, 209, 217)
+        };
+        let gh_border = if gh_focused {
+            Color::Rgb(139, 148, 158)
+        } else {
+            Color::Rgb(48, 54, 61)
+        };
+
+        let km_style = Style::default().fg(km_fg).bg(km_bg);
+        let gh_style = Style::default().fg(gh_fg).bg(gh_bg).add_modifier(Modifier::BOLD);
+
+        let km_label = if km_focused {
+            " ⏎ KNOW MORE "
+        } else {
+            "   KNOW MORE "
         };
         let gh_label = if gh_focused {
-            " ⏎ ⌂ github "
+            " ⏎ \u{f09b} GITHUB "
         } else {
-            "   ⌂ github "
+            "   \u{f09b} GITHUB "
         };
 
         let btn_line = Line::from(vec![
-            Span::styled("┌", Style::default().fg(if km_focused { accent } else { DIM })),
+            Span::styled("┌", Style::default().fg(km_border).bg(km_bg)),
             Span::styled(km_label, km_style),
-            Span::styled("┐", Style::default().fg(if km_focused { accent } else { DIM })),
+            Span::styled("┐", Style::default().fg(km_border).bg(km_bg)),
             Span::styled("  ", Style::default()),
-            Span::styled("┌", Style::default().fg(if gh_focused { Color::Rgb(110, 84, 148) } else { DIM })),
+            Span::styled("┌", Style::default().fg(gh_border).bg(gh_bg)),
             Span::styled(gh_label, gh_style),
-            Span::styled("┐", Style::default().fg(if gh_focused { Color::Rgb(110, 84, 148) } else { DIM })),
+            Span::styled("┐", Style::default().fg(gh_border).bg(gh_bg)),
         ]);
         f.render_widget(Paragraph::new(btn_line), btn_area);
 
@@ -263,17 +280,17 @@ fn render_project_card(
             let border_area = Rect::new(area.x + 7, area.y + 4, area.width.saturating_sub(7), 1);
             let km_w = km_label.chars().count();
             let gh_w = gh_label.chars().count();
-            let km_border = "─".repeat(km_w);
-            let gh_border = "─".repeat(gh_w);
+            let km_border_line = "─".repeat(km_w);
+            let gh_border_line = "─".repeat(gh_w);
 
             let border_line = Line::from(vec![
-                Span::styled("└", Style::default().fg(if km_focused { accent } else { DIM })),
-                Span::styled(km_border, Style::default().fg(if km_focused { accent } else { DIM })),
-                Span::styled("┘", Style::default().fg(if km_focused { accent } else { DIM })),
+                Span::styled("└", Style::default().fg(km_border).bg(km_bg)),
+                Span::styled(km_border_line, Style::default().fg(km_border).bg(km_bg)),
+                Span::styled("┘", Style::default().fg(km_border).bg(km_bg)),
                 Span::styled("  ", Style::default()),
-                Span::styled("└", Style::default().fg(if gh_focused { Color::Rgb(110, 84, 148) } else { DIM })),
-                Span::styled(gh_border, Style::default().fg(if gh_focused { Color::Rgb(110, 84, 148) } else { DIM })),
-                Span::styled("┘", Style::default().fg(if gh_focused { Color::Rgb(110, 84, 148) } else { DIM })),
+                Span::styled("└", Style::default().fg(gh_border).bg(gh_bg)),
+                Span::styled(gh_border_line, Style::default().fg(gh_border).bg(gh_bg)),
+                Span::styled("┘", Style::default().fg(gh_border).bg(gh_bg)),
             ]);
             f.render_widget(Paragraph::new(border_line), border_area);
         }
@@ -299,33 +316,21 @@ pub fn render_project_detail(f: &mut Frame, area: Rect, app: &App, accent: Color
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // github widget row
+            Constraint::Length(1), // github widget row
             Constraint::Min(0),   // scrollable content
             Constraint::Length(1), // footer hints
         ])
         .split(inner);
 
     // ── GitHub widget (top-right style) ──────────────────────────────────────
-    let gh_style = Style::default()
-        .fg(Color::Black)
-        .bg(Color::Rgb(110, 84, 148))
-        .add_modifier(Modifier::BOLD);
-    let gh_border_color = Color::Rgb(110, 84, 148);
+    let gh_style = Style::default().fg(Color::Rgb(110, 84, 148)).add_modifier(Modifier::BOLD);
 
-    let gh_top = Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("┌", Style::default().fg(gh_border_color)),
-        Span::styled(" ⌂ github ", gh_style),
-        Span::styled("┐", Style::default().fg(gh_border_color)),
+    let gh_line = Line::from(vec![
+        Span::styled("  [ \u{f09b} GITHUB ]", gh_style),
         Span::styled("  ", Style::default()),
         Span::styled(proj.github_url, Style::default().fg(DIM)),
     ]);
-    let gh_bot = Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled("└──────────┘", Style::default().fg(gh_border_color)),
-    ]);
-    let gh_widget = Paragraph::new(vec![gh_top, gh_bot]);
-    f.render_widget(gh_widget, chunks[0]);
+    f.render_widget(Paragraph::new(gh_line), chunks[0]);
 
     // ── Content area ─────────────────────────────────────────────────────────
     let content_area = chunks[1];

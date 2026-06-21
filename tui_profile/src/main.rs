@@ -658,12 +658,29 @@ use ratzilla::WebRenderer;
     export function open_url_js(url) {
         window.open(url, '_blank');
     }
+    export function apply_terminal_font() {
+        const setFont = () => {
+            const canvases = document.querySelectorAll('#terminal-container canvas');
+            canvases.forEach(canvas => {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.font = "16px 'JetBrains Mono', 'Font Awesome 6 Free', 'Font Awesome 6 Brands', monospace";
+                }
+            });
+        };
+        setFont();
+        setTimeout(setFont, 100);
+        setTimeout(setFont, 500);
+        setTimeout(setFont, 1000);
+        window.addEventListener('resize', setFont);
+    }
 "#)]
 extern "C" {
     fn request_fullscreen();
     fn exit_fullscreen();
     fn setup_fullscreen_click();
     fn open_url_js(url: &str);
+    fn apply_terminal_font();
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -706,6 +723,9 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
             .grid_id("terminal-container")
     )?;
     let terminal = Terminal::new(backend)?;
+
+    // Apply the custom JetBrains Mono + FontAwesome fonts to the canvas context
+    apply_terminal_font();
 
     terminal.on_key_event({
         let app = app.clone();
