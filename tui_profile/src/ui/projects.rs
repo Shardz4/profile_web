@@ -33,20 +33,42 @@ architecture. Performance-critical perception (lane detection, object tracking, 
 classification, ONNX inference) runs in compiled Rust via PyO3 bindings, while the application \
 layer orchestrates everything in Python with OpenCV and Ultralytics YOLO. The system features \
 Canny + Hough lane detection, centroid-based object tracking with TTC estimation, HSV-based \
-traffic light classification, and a custom ONNX runtime for traffic sign recognition.",
+traffic light classification, and a custom ONNX runtime for traffic sign recognition. The \
+Rust source compiles into a Python extension module (adas_pilot) exposing detect_lanes_rust(), \
+check_traffic_lights(), RustTracker, RustLaneManager, and AdasBrain with full ONNX inference. \
+The Python application layer (main.py) orchestrates the camera loop, AI pipeline, and HUD \
+rendering. Training and export utilities allow fine-tuning YOLOv8 on custom traffic sign \
+datasets and exporting to ONNX format.",
         problem_statement: "Traditional ADAS solutions are tightly coupled to expensive hardware sensor suites \
-(LiDAR, radar arrays) costing thousands of dollars, making them inaccessible for research and \
-aftermarket applications. Most open-source alternatives run entirely in Python, suffering from \
-real-time latency issues that make them unreliable for actual driving guidance. There is a gap \
-for a software-only, guidance-focused ADAS that can run on commodity hardware with a single \
-camera feed while maintaining real-time performance.",
-        why_better: "By offloading all latency-critical perception kernels (lane detection, object tracking, \
-traffic light classification) to compiled Rust while keeping the orchestration layer in Python \
-for flexibility, the system achieves near-native performance without sacrificing developer \
-ergonomics. The PyO3 bridge enables zero-copy NumPy array passing between languages. Unlike \
-full ADAS stacks that aim for autonomous control, this system focuses purely on guidance \
-(warnings and HUD overlays), dramatically reducing the safety certification burden while \
-remaining genuinely useful as a driver aid.",
+(LiDAR, radar arrays, ultrasonic sensors) costing thousands of dollars per vehicle, making \
+them completely inaccessible for independent research, aftermarket applications, and developing \
+nations. Most commercial systems (Mobileye, Tesla Autopilot) are black-box proprietary stacks \
+that cannot be inspected, modified, or extended by researchers. On the open-source side, \
+virtually all alternatives run entirely in Python — a language that suffers from GIL \
+contention, high per-frame latency, and unpredictable garbage collection pauses that make \
+real-time perception unreliable. A typical Python-only YOLO + OpenCV pipeline can barely \
+sustain 10-15 FPS on commodity hardware, far below the 25-30 FPS minimum needed for \
+responsive driver guidance. Furthermore, most open-source ADAS projects attempt full \
+autonomous control (steering, braking), which is both legally complex and dangerous without \
+redundant sensor fusion — there is a critical gap for a software-only system that focuses \
+purely on guidance (warnings and visual overlays) using a single camera feed, making it \
+safe, legal, and deployable on any vehicle with a dashcam.",
+        why_better: "By offloading all latency-critical perception kernels to compiled Rust while keeping \
+the orchestration layer in Python for flexibility, the system achieves near-native C++ \
+performance without sacrificing developer ergonomics or rapid prototyping capability. The \
+PyO3 bridge enables zero-copy NumPy array passing between languages — raw camera frames \
+flow from Python to Rust without serialization, and detection results flow back as native \
+NumPy arrays. The architecture is split into specialized Rust modules: lane_detect.rs \
+(Canny + Hough transform), lane_manager.rs (temporal smoothing and ego-lane filtering), \
+object_proc.rs (centroid-based multi-object tracking with Time-To-Collision estimation), \
+traffic_light.rs (HSV color-space classification), and lib.rs (AdasBrain with custom ONNX \
+runtime via the ort crate for traffic sign recognition and Non-Maximum Suppression). Unlike \
+full ADAS stacks that aim for autonomous vehicle control, this system focuses purely on \
+guidance — providing real-time HUD overlays and audio warnings without ever touching \
+steering or braking. This dramatically reduces the safety certification burden while \
+remaining genuinely useful as a driver aid. The system runs on commodity hardware with a \
+single camera, requires no LiDAR or radar, and the maturin build system produces a single \
+pip-installable extension module that works on Linux, macOS, and Windows.",
     },
     ProjectData {
         name: "Lore",
@@ -57,24 +79,50 @@ remaining genuinely useful as a driver aid.",
 introduces a paradigm shift in AI observability by forcing AI agents to mathematically prove \
 their workflows using Zero-Knowledge Proofs (RISC Zero zkVM) and enforcing honesty via an \
 Off-Chain Algorithmic Slashing mechanic. The system consists of tiered agentic layers: a \
-Scout Agent (Go) for edge ingestion, an Analyst Agent (Rust) for async stream processing \
-and ZK proof generation, a Narrative Agent (Go) interfacing with Gemini for PM-friendly \
-summaries, a Next.js Dashboard as the command center, ZK Circuits (Rust) for RISC Zero \
-guest/host implementation, and Solidity Smart Contracts for on-chain Groth16 proof \
-verification.",
-        problem_statement: "Current AI observability platforms trust agent outputs at face value — there is no \
-cryptographic guarantee that an AI agent's reported insights actually match the data it \
-processed. Enterprise product teams making decisions based on AI-generated behavioral \
-analytics have no way to verify the integrity of the analysis pipeline. Meanwhile, \
-traditional blockchain-based solutions require expensive ERC20 token staking to enforce \
-accountability, creating unnecessary financial overhead.",
-        why_better: "Lore solves the trust problem without tokens by introducing Algorithmic Slashing: agents \
-are assigned a mathematical trust score based on their success rate, with exponential \
-penalties for hallucination. If an agent's score drops below 60%, it is automatically banned. \
-The Zero-Knowledge Privacy Layer (RISC Zero zkVM) ensures raw data never leaves the edge — \
-only cryptographic proofs are submitted on-chain via a Groth16 verifier contract. This means \
-enterprise data stays private while the integrity of every insight is publicly verifiable. \
-Built-in Dead-Letter Queues ensure zero data loss even during LLM provider outages.",
+Scout Agent (Go) for edge ingestion acting as an MCP Client pushing data to Redis Streams, \
+an Analyst Agent (Rust) for async stream processing and ZK proof generation acting as the \
+Punisher to slash hallucinating agents, a Narrative Agent (Go) interfacing with Google \
+Gemini (gemini-2.5-flash) for PM-friendly summaries and exposing the REST API, a Next.js \
+Dashboard as the command center displaying a Global Trust Leaderboard, ZK Circuits (Rust) \
+for RISC Zero guest/host implementation, and Solidity Smart Contracts \
+(LoreZKVerifierLedger.sol) for on-chain Groth16 proof verification. The entire system is \
+orchestrated via Docker Compose with Redis Streams as the distributed message broker, and \
+OpenTelemetry + Jaeger provide end-to-end tracing from edge ingestion to blockchain commit.",
+        problem_statement: "Current AI observability platforms (Datadog AI Monitoring, LangSmith, Weights & \
+Biases) trust agent outputs at face value — there is no cryptographic guarantee that an \
+AI agent's reported insights actually match the raw data it processed. Enterprise product \
+teams making critical business decisions based on AI-generated behavioral analytics have \
+zero mechanism to verify the integrity of the analysis pipeline. An agent could hallucinate \
+engagement metrics, fabricate user journey insights, or silently drop edge cases, and no \
+one would know. Meanwhile, traditional blockchain-based accountability solutions require \
+expensive ERC20 token staking to enforce honesty, creating unnecessary financial overhead \
+and introducing complex tokenomics that distract from the core problem. The staking model \
+also fails to address the fundamental issue: proving that the computational work itself was \
+honest, not just that the agent has collateral at risk. Additionally, most observability \
+systems expose raw JSON payloads and proprietary enterprise data on-chain or to third-party \
+platforms, creating unacceptable data privacy risks for regulated industries like healthcare \
+and finance. There is no existing system that simultaneously guarantees computational \
+integrity, preserves data privacy, enforces agent accountability without tokens, and \
+provides end-to-end traceability from raw telemetry to final insight.",
+        why_better: "Lore solves the trust problem without tokens by introducing Algorithmic Slashing — a \
+purely mathematical accountability mechanism implemented in reputation.go. Each agent is \
+assigned a Trust Score computed as (Success / (Success + Fail)) * 100, with exponential \
+penalty factors applied for every hallucination. If an agent's score drops below 60%, the \
+system explicitly bans it from committing further data — no token staking, no financial \
+overhead, just pure math. The Zero-Knowledge Privacy Layer (RISC Zero zkVM) ensures raw \
+enterprise data never leaves the edge node. The Guest Circuit executes inside the VM to \
+securely verify that the agent's analysis didn't hallucinate, while only cryptographic \
+ZK-SNARK proofs and redacted public journals are submitted on-chain via the \
+LoreZKVerifierLedger.sol Groth16 verifier contract. This means enterprise behavioral data \
+stays completely private while the integrity of every insight is publicly and permanently \
+verifiable on the blockchain. Built-in Dead-Letter Queues (DLQ) ensure zero data loss even \
+during LLM provider outages or agent crashes. The system is fully observable via \
+OpenTelemetry and Jaeger — every single behavioral event is traceable from the edge \
+ingestion point all the way to the final LLM-generated summary. The architecture scales \
+horizontally: Scout Agents can be deployed at thousands of edge locations, all streaming \
+into Redis, with multiple Analyst Agents consuming and proving in parallel. Deployed at \
+lore-sand-kappa.vercel.app with a live Next.js dashboard showing the Global Trust \
+Leaderboard and real-time ZK proof submission interface.",
     },
     ProjectData {
         name: "Raven",
@@ -82,51 +130,105 @@ Built-in Dead-Letter Queues ensure zero data loss even during LLM provider outag
         tech_stack: "Go · Python · Streamlit · Docker · NATS JetStream · Multi-LLM",
         github_url: "https://github.com/Shardz4/Raven",
         detail_desc: "Raven is an autonomous AI-powered software development agent that resolves GitHub issues \
-entirely on autopilot. Given a GitHub issue URL, Raven fetches issue context, fans out the \
-prompt to multiple LLMs (GPT-4o, Claude Sonnet, DeepSeek, Grok, Ollama) in parallel, \
-collects generated code patches, verifies each patch inside a secure Docker sandbox, scores \
-them through the novel RavenMind multi-phase consensus engine, and optionally opens a Pull \
-Request with the winning solution. It supports monolithic mode for local dev and fully \
-distributed multi-agent mode via NATS JetStream, with Telegram and Discord bot integration \
-for live progress updates.",
-        problem_statement: "Traditional AI code generation relies on a single model's output, which is brittle — \
-a single hallucination, subtle bug, or security vulnerability can slip through undetected. \
-Existing tools like Copilot and Cursor generate code suggestions but don't verify them. \
-There is no automated system that treats code generation as an ensemble problem, combining \
-multiple AI perspectives with rigorous automated testing to select the best solution.",
-        why_better: "Raven's key innovation is the RavenMind Consensus engine — a weighted 4-phase evaluation \
-pipeline combining: (1) static analysis safety checks, (2) dynamic sandbox test execution \
-in Docker, (3) structural code similarity clustering, and (4) independent LLM-as-judge \
-evaluation. By querying N different LLMs simultaneously and subjecting all candidates to \
-this rigorous pipeline, the system is demonstrably more reliable than any single model. \
-When all patches fail testing, Raven autonomously self-heals by feeding error logs back \
-to the LLMs and re-prompting — achieving resolution without human intervention.",
+entirely on autopilot. Given a GitHub issue URL, Raven fetches issue context via the GitHub \
+REST API, detects the repository's primary programming language, fans out the prompt to \
+multiple LLMs (GPT-4o, Claude Sonnet, DeepSeek, Grok, Ollama) in parallel using goroutine-\
+based fan-out with sync.Mutex synchronization, collects generated code patches, verifies \
+each patch inside a secure Docker sandbox, scores them through the novel RavenMind multi-\
+phase consensus engine, and optionally opens a Pull Request with the winning solution by \
+forking the repo, creating a raven/fix-issue-N branch, and committing a language-aware \
+solution file. It supports monolithic mode for local dev and fully distributed multi-agent \
+mode via NATS JetStream with 9 containerized services (Store, API Server, Orchestrator, \
+per-provider Solver workers, Safety Agent, Sandbox Agent, Consensus Agent, PR Agent), with \
+Telegram and Discord bot integration for live progress updates via SSE streams.",
+        problem_statement: "Traditional AI code generation relies on a single model's output, which is \
+fundamentally brittle — a single hallucination, subtle off-by-one error, security \
+vulnerability, or misunderstood API contract can slip through completely undetected. \
+Existing tools like GitHub Copilot and Cursor generate inline code suggestions but perform \
+zero verification — they don't compile the code, don't run tests, don't check for security \
+vulnerabilities, and don't validate that the generated solution actually addresses the \
+original issue. There is no automated system that treats code generation as an ensemble \
+problem, combining multiple AI perspectives with rigorous automated testing to select the \
+best solution. Furthermore, current tools require constant human supervision: a developer \
+must review every suggestion, manually test it, and decide whether to accept or reject. \
+For well-defined bug reports and feature requests in open-source projects, this human-in-\
+the-loop overhead is unnecessary and expensive. The industry lacks an end-to-end autonomous \
+agent that can take a GitHub issue URL, generate multiple candidate solutions from diverse \
+AI models, rigorously test each one in isolation, mathematically select the best candidate, \
+and open a production-ready Pull Request — all without any human intervention. Additionally, \
+when all candidate solutions fail, existing tools simply give up; there is no self-healing \
+mechanism that learns from failure logs and iteratively improves the solutions.",
+        why_better: "Raven's key innovation is the RavenMind Consensus engine — a weighted 4-phase \
+evaluation pipeline that is fundamentally more reliable than any single model. Phase 1: \
+Static Analysis Safety checks scan every candidate patch for dangerous patterns (eval(), \
+exec(), os.system(), subprocess calls, file system mutations) before any code is executed. \
+Phase 2: Dynamic Sandbox Execution runs each patch inside an isolated Docker container \
+(configurable via SANDBOX_IMAGE and DOCKER_TIMEOUT), capturing stdout, stderr, and exit \
+codes to verify functional correctness. Phase 3: Structural Similarity Clustering groups \
+patches by code structure, rewarding solutions that multiple independent models converged \
+on — the intuition being that if GPT-4o, Claude, and DeepSeek all produce structurally \
+similar fixes, that fix is likely correct. Phase 4: Independent LLM-as-Judge evaluation \
+uses a dedicated judge model (configurable via JUDGE_PROVIDER/JUDGE_MODEL, or a custom \
+endpoint) to score each candidate on correctness, code quality, and adherence to the \
+original issue requirements. The final weighted composite score selects the winner. When \
+all patches fail testing, Raven autonomously self-heals: it feeds the Docker error logs \
+and stack traces back to the LLMs and re-prompts them, repeating up to MAX_HEAL_RETRIES \
+times — achieving resolution without any human intervention. The Provider abstraction \
+(provider.go) enables trivial addition of new LLM backends, and the fan-out architecture \
+ensures the system scales linearly with the number of providers. The Streamlit frontend \
+provides a dark-themed glassmorphism UI with real-time SSE streaming of the consensus \
+process, a dashboard with job history and success rate analytics, and live system health \
+monitoring of connected LLM providers.",
     },
     ProjectData {
         name: "CustomCV",
         short_desc: "High-performance Computer Vision library in Rust with zero-copy Python bindings via PyO3.",
         tech_stack: "Rust · Python · PyO3 · rust-numpy · Maturin",
         github_url: "https://github.com/Shardz4/CustomCV",
-        detail_desc: "A high-performance Computer Vision library written entirely in Rust with seamless Python \
-bindings. Operations execute natively in Rust through PyO3 + rust-numpy, so every function \
-accepts and returns regular NumPy arrays with no data-copy overhead. The library implements \
-core CV operations from scratch: color space conversions (RGB to grayscale, HSV), edge \
-detection (Canny, Sobel), morphological operations (dilation, erosion, opening, closing), \
-filtering (Gaussian blur, median filter), thresholding, histogram equalization, and \
-geometric transforms. Ships with CI/CD building wheels for Linux, macOS, and Windows.",
-        problem_statement: "OpenCV is the de facto standard for computer vision in Python, but it is a massive C++ \
-monolith with complex build dependencies, inconsistent Python API wrappers, and significant \
-data marshalling overhead when crossing the C++/Python boundary. For projects that need only \
-core image processing primitives, pulling in the entire OpenCV ecosystem is overkill. \
-Additionally, the lack of memory safety in the C++ core leads to subtle bugs in edge cases \
-that are difficult to debug from the Python side.",
-        why_better: "By implementing CV primitives from scratch in Rust, the library achieves C++-level \
-performance with Rust's memory safety guarantees — no segfaults, no buffer overflows, no \
-undefined behavior. The PyO3 + rust-numpy bridge enables true zero-copy interop: NumPy \
-arrays are passed directly to Rust functions without serialization or copying, keeping \
-memory overhead near zero. The library is lightweight (no OpenCV dependency), compiles to \
-a single .pyd/.so extension module via Maturin, and the --release builds enable full LLVM \
-optimizations. Cross-platform CI ensures wheels work on all major operating systems.",
+        detail_desc: "A high-performance Computer Vision library written entirely in Rust (100% Rust codebase) \
+with seamless Python bindings. Operations execute natively in Rust through PyO3 + rust-numpy, \
+so every function accepts and returns regular NumPy arrays with no data-copy overhead. The \
+library implements core CV operations from scratch: color space conversions (rgb_to_gray, \
+RGB to HSV), edge detection (apply_canny with configurable low/high thresholds, Sobel), \
+morphological operations (apply_dilation, erosion, opening, closing with custom kernels), \
+filtering (Gaussian blur, median filter), thresholding, histogram equalization, and geometric \
+transforms. Ships with GitHub Actions CI workflow (.github/workflows/CI.yml) building wheels \
+for Linux, macOS, and Windows on every push. The library compiles to a single rust_cv_lib \
+Python extension module installable via maturin develop --release.",
+        problem_statement: "OpenCV is the de facto standard for computer vision in Python, but it is a massive \
+C++ monolith with over 2,500 algorithms and complex build dependencies (cmake, libgtk, \
+libavcodec, and dozens of optional modules) that make installation a nightmare — especially \
+on embedded systems, CI pipelines, and minimal Docker images. The Python API is an auto-\
+generated wrapper around the C++ core, leading to inconsistent function signatures, opaque \
+error messages that reference C++ internals, and significant data marshalling overhead when \
+arrays cross the C++/Python boundary through SWIG bindings. For the vast majority of \
+computer vision projects that need only core image processing primitives (grayscale \
+conversion, edge detection, morphological operations, filtering), pulling in the entire \
+OpenCV ecosystem is massive overkill — a typical pip install opencv-python downloads 60+ MB \
+of compiled binaries. Additionally, the lack of memory safety in the C++ core leads to \
+subtle bugs in edge cases: buffer overflows on malformed images, use-after-free in multi-\
+threaded pipelines, and undefined behavior from uninitialized memory — all of which surface \
+as cryptic segfaults that are nearly impossible to debug from the Python side. There is no \
+lightweight, memory-safe alternative that provides just the essential CV primitives with a \
+Pythonic API and zero-copy performance.",
+        why_better: "By implementing every CV primitive from scratch in Rust, the library achieves C++-\
+level performance with Rust's compile-time memory safety guarantees — no segfaults, no \
+buffer overflows, no use-after-free, no undefined behavior, and no data races in multi-\
+threaded contexts. The borrow checker catches entire categories of bugs at compile time \
+that would be runtime crashes in C++. The PyO3 + rust-numpy bridge enables true zero-copy \
+interop: NumPy arrays are passed directly to Rust functions as ndarray views without any \
+serialization, copying, or data marshalling, keeping memory overhead near zero and \
+eliminating the SWIG bridge overhead that plagues OpenCV's Python bindings. The library is \
+radically lightweight — no OpenCV dependency, no cmake, no system libraries, just a single \
+.pyd (Windows) or .so (Linux/macOS) extension module produced by Maturin. The --release \
+build flag enables full LLVM optimizations (auto-vectorization, loop unrolling, constant \
+folding) that match hand-tuned C++ performance. The API is deliberately Pythonic: functions \
+like rgb_to_gray(image), apply_canny(gray, 50.0, 150.0), and apply_dilation(edges, kernel) \
+accept and return standard NumPy arrays, making the library a drop-in replacement for \
+OpenCV's most commonly used functions. Cross-platform CI via GitHub Actions \
+(.github/workflows/CI.yml) ensures pre-built wheels work on all major operating systems, \
+and cargo test + cargo clippy maintain code quality on every commit. The library is 100% \
+Rust with no unsafe blocks, making it auditable for safety-critical applications.",
     },
 ];
 
