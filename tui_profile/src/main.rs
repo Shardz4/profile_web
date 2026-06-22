@@ -531,6 +531,47 @@ where
                             app.project_detail_scroll += 1;
                         }
                         KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(()),
+                        KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
+                        KeyCode::Tab => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.next_tab();
+                        }
+                        KeyCode::BackTab => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.prev_tab();
+                        }
+                        KeyCode::Char('1') => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.tab_index = 0;
+                            app.mark_tab_visited();
+                        }
+                        KeyCode::Char('2') => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.tab_index = 1;
+                            app.mark_tab_visited();
+                        }
+                        KeyCode::Char('3') => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.tab_index = 2;
+                            app.mark_tab_visited();
+                        }
+                        KeyCode::Char('4') => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.tab_index = 3;
+                            app.mark_tab_visited();
+                        }
+                        KeyCode::Char('5') => {
+                            app.project_detail_view = false;
+                            app.project_detail_scroll = 0;
+                            app.tab_index = 4;
+                            app.mark_tab_visited();
+                        }
                         _ => {}
                     }
                 } else if app.tab_index == 1 {
@@ -771,8 +812,47 @@ fn init_app(app: Rc<RefCell<App>>) -> Result<(), Box<dyn Error>> {
                     KeyCode::Down | KeyCode::Char('j') => {
                         app.project_detail_scroll += 1;
                     }
+                    KeyCode::Char('t') | KeyCode::Char('T') => app.cycle_theme(),
+                    KeyCode::Char('f') | KeyCode::Char('F') => {
+                        request_fullscreen();
+                    }
                     KeyCode::Char('q') | KeyCode::Char('Q') => {
                         exit_fullscreen();
+                    }
+                    KeyCode::Tab => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.next_tab();
+                    }
+                    KeyCode::Char('1') => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.tab_index = 0;
+                        app.mark_tab_visited();
+                    }
+                    KeyCode::Char('2') => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.tab_index = 1;
+                        app.mark_tab_visited();
+                    }
+                    KeyCode::Char('3') => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.tab_index = 2;
+                        app.mark_tab_visited();
+                    }
+                    KeyCode::Char('4') => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.tab_index = 3;
+                        app.mark_tab_visited();
+                    }
+                    KeyCode::Char('5') => {
+                        app.project_detail_view = false;
+                        app.project_detail_scroll = 0;
+                        app.tab_index = 4;
+                        app.mark_tab_visited();
                     }
                     _ => {}
                 }
