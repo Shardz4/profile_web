@@ -20,8 +20,7 @@ impl Widget for MarioWidget {
 
         if cycle_tick < run_ticks {
             let x = cycle_tick / speed;
-            
-            // Mario jumps every 45 columns
+            // mario jumps every 45 columns
             let x_mod = x % 45;
             let is_jumping = x_mod >= 15 && x_mod <= 25;
 
