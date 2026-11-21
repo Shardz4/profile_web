@@ -1,10 +1,10 @@
-# 👨‍💻 Arnav Sharma | WASM Terminal Portfolio
+#  Arnav Sharma | WASM Terminal Portfolio
 
 A high-performance, retro-futuristic developer profile and systems monitor emulator built using **Rust**, **Ratatui**, and **Ratzilla**. The application compiles to WebAssembly (WASM) using Trunk, rendering a fully interactive, 120Hz canvas-driven terminal interface directly in the web browser.
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 *   **Retro CRT Terminal UI**: Styled with responsive terminal grids, custom borders, scanline overlay filters, and dynamic neon glow effects.
 *   **Animated Boot Splash Screen**: A vintage telemetry screen featuring real-time diagnostic animations (120Hz core voltage bars, dual-sinusoidal phase charts, real-time frequency analytics spectrums) before loading the main developer profile.
@@ -19,7 +19,7 @@ A high-performance, retro-futuristic developer profile and systems monitor emula
 
 ---
 
-## 🎮 Key Controls & Navigation
+##  Key Controls & Navigation
 
 | **Key** | **Action** |
 | :--- | :--- |
@@ -32,7 +32,7 @@ A high-performance, retro-futuristic developer profile and systems monitor emula
 
 ---
 
-## 🛠️ The Tech Arsenal
+##  The Tech Arsenal
 
 | **Category** | **Tools & Technologies** |
 | :--- | :--- |
@@ -42,7 +42,7 @@ A high-performance, retro-futuristic developer profile and systems monitor emula
 
 ---
 
-## 👾 Custom TUI Double-Pixel Rendering
+##  Custom TUI Double-Pixel Rendering
 
 A typical terminal character cell has a roughly 1:2 width-to-height aspect ratio. To render block art without stretching, this application utilizes a custom double-pixel rasterizer:
 *   **Vertical Half-Blocks**: By utilizing unicode half-block characters (`▀` and `▄`), we fit two vertical pixels inside a single character cell.
@@ -51,7 +51,7 @@ A typical terminal character cell has a roughly 1:2 width-to-height aspect ratio
 
 ---
 
-## 🛠️ Setup & Running Locally
+##  Setup & Running Locally
 
 ### 1. Prerequisites
 
@@ -87,7 +87,7 @@ cargo run --release
 
 ---
 
-## 📁 Repository Structure
+##  Repository Structure
 
 ```
 ├── tui_profile/
